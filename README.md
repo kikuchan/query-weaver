@@ -12,10 +12,7 @@ const foo = 1, bar = 'Bar';
 const query = sql`SELECT * FROM foobar WHERE foo = ${ foo } AND bar = ${ bar }`;
 
 console.log(query.toString());
-```
-=>
-```sql
-SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'
+// SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'
 ```
 
 
@@ -28,19 +25,16 @@ const db = useQueryHelper(new pg.Pool(), { beforeQuery: (ctx) => console.log("DE
 
 const foo = 1, bar = 'Bar';
 const { rows } = await db.query`SELECT * FROM foobar WHERE foo = ${ foo } AND bar = ${ bar }`;
+// DEBUG: {
+//   text: 'SELECT * FROM foobar WHERE foo = $1 AND bar = $2',
+//   values: [ 1, 'Bar' ],
+//   embed: "SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'"
+// }
 
 console.log(rows);
+// [ { foo: 1, bar: 'Bar' } ]
 
 db.end(); // this call will be proxied to the original pg.Pool() instance
-```
-=>
-```
-DEBUG: {
-  text: 'SELECT * FROM foobar WHERE foo = $1 AND bar = $2',
-  values: [ 1, 'Bar' ],
-  embed: "SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'"
-}
-[ { foo: 1, bar: 'Bar' } ]
 ```
 
 As you can see, the query is executed using **placeholder** for the database. This makes string-value concatenation safe.
@@ -52,10 +46,7 @@ import { sql, WHERE, OR } from 'query-weaver';
 
 const a = 1, b = "string", c = null, d = 5, e = false;
 console.log(String(sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`));
-```
-=>
-```sql
-SELECT * FROM foobar WHERE ((a = '1') AND (b = 'string') AND (c IS NULL) AND (((d = '5') OR (e = false))))
+// SELECT * FROM foobar WHERE ((a = '1') AND (b = 'string') AND (c IS NULL) AND (((d = '5') OR (e = false))))
 ```
 
 ### JSON builder
@@ -68,15 +59,15 @@ const db = useQueryHelper(new pg.Pool());
 const id = 10;
 const obj = { b: 'string', c: [1, 2, 'X'], d: { e: null, f: undefined } }
 
-const row = await db.getRow`SELECT a FROM jsonb_to_record(${json`{ "a": ${ obj }, "b": ${id} }`}) AS (a jsonb, b int, c jsonb, d jsonb);`
+const row = await db.getRow`SELECT * FROM jsonb_to_record(${json`{ "a": ${ obj }, "b": ${id} }`}) AS (a jsonb, b int);`
 
 console.log(row);
+// {
+//   a: { b: 'string', c: [ 1, 2, 'X' ], d: { e: null } },
+//   b: 10,
+// }
 
 db.end();
-```
-=>
-```
-{ a: { b: 'string', c: [ 1, 2, 'X' ], d: { e: null } } }
 ```
 
 ### Simple INSERT helper and executor
