@@ -2,8 +2,15 @@ import type pg from 'pg';
 import type { QueryFragment, FieldValues, WhereArg } from './query-weaver';
 import { sql, buildInsert, buildUpdate, buildDelete } from './query-weaver';
 
-interface Queryable {
-  query: <T extends pg.QueryResultRow>(text: string, values: unknown[]) => Promise<pg.QueryResult<T>>
+type pgQueryResultCustom<R> = {
+  rowCount: number;
+  rows: R[];
+  fields?: Partial<pg.FieldDef>[];
+}
+type pgQueryResult<R> = Omit<Partial<pg.QueryResult>, keyof pgQueryResultCustom<R>> & pgQueryResultCustom<R>;
+
+export interface Queryable {
+  query: <T extends pg.QueryResultRow>(query: { text: string, values?: unknown[] }) => Promise<pgQueryResult<T>> // & Record<string, any>>
 }
 
 type QueryHelperOptions = {
@@ -62,7 +69,7 @@ export class QueryHelper {
 
     this.#opts?.beforeQuery?.(ctx);
 
-    const result = await this.#db.query<T>(ctx.text, ctx.values);
+    const result = await this.#db.query<T>(ctx);
 
     this.#opts?.afterQuery?.({ ... ctx, result });
 
@@ -90,6 +97,9 @@ export class QueryHelper {
     return await this.#query<T>([query]);
   }
 
+  async query<T extends pg.QueryResultRow = any>(text: TemplateStringsArray, ...values: unknown[]): Promise<pgQueryResult<T>>;
+  async query<T extends pg.QueryResultRow = any>(text: string, values?: unknown[]): Promise<pgQueryResult<T>>;
+  async query<T extends pg.QueryResultRow = any>(query: QueryFragment, values?: unknown[]): Promise<pgQueryResult<T>>;
   async query<T extends pg.QueryResultRow = any>(...args: QueryTemplateAwareArgs) {
     return this.#query<T>(args);
   }
