@@ -1,6 +1,6 @@
 import type pg from "pg";
-import type { QueryFragment, FieldValues, WhereArg } from "./query-weaver.js";
-import { sql, buildInsert, buildUpdate, buildDelete } from "./query-weaver.js";
+import type { QueryFragment, FieldValues, WhereArg } from "./query-weaver";
+import { sql, buildInsert, buildUpdate, buildDelete } from "./query-weaver";
 
 // pg (almost) compatible types to relief and reduce their requirements
 type pgQueryResultCustom<R> = {
