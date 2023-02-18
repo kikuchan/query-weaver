@@ -1,6 +1,6 @@
 {
   "name": "query-weaver",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "SQL query builder using template string literal",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.mjs",
@@ -27,8 +27,5 @@
   },
   "dependencies": {
     "pg-escape": "^0.2.0"
-  },
-  "optionalDependencies": {
-    "pg": "^8.9.0"
   }
 }
