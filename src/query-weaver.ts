@@ -37,7 +37,7 @@ abstract class QueryFragmentBase implements QueryFragment {
 
   get compiled() {
     const values = [] as unknown[];
-    const text  = this.toString({ valueFn: (x: unknown) => { values.push(x); return `$${values.length}`; } });
+    const text  = this.toString({ valueFn: (x: unknown) => { values.push(x); return '$' + values.length; } });
     const embed = this.toString();
 
     return {

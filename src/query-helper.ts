@@ -2,6 +2,7 @@ import type pg from 'pg';
 import type { QueryFragment, FieldValues, WhereArg } from './query-weaver.js';
 import { sql, buildInsert, buildUpdate, buildDelete } from './query-weaver.js';
 
+// pg (almost) compatible types to relief and reduce their requirements
 type pgQueryResultCustom<R> = {
   rowCount: number;
   rows: R[];
@@ -10,7 +11,7 @@ type pgQueryResultCustom<R> = {
 type pgQueryResult<R> = Omit<Partial<pg.QueryResult>, keyof pgQueryResultCustom<R>> & pgQueryResultCustom<R>;
 
 export interface Queryable {
-  query: <T extends pg.QueryResultRow>(queryConfig: { text: string, values?: unknown[] }) => Promise<pgQueryResult<T>> // & Record<string, any>>
+  query: <T extends pg.QueryResultRow>(queryConfig: { text: string, values?: unknown[] }) => Promise<pgQueryResult<T>>
 }
 
 type QueryHelperOptions = {
