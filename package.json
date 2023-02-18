@@ -1,6 +1,6 @@
 {
   "name": "query-weaver",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "SQL query builder using template string literal",
   "main": "./dist/index.cjs.js",
   "module": "./dist/index.esm.mjs",
@@ -10,6 +10,7 @@
   ],
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.esm.mjs",
       "require": "./dist/index.cjs.js"
     }
@@ -18,7 +19,7 @@
     "clean": "rimraf dist",
     "test": "jest",
     "build": "npm run clean && npm run build:esbuild && npm run build:types",
-    "build:esbuild": "node -r esbuild-register build.js",
+    "build:esbuild": "node -r esbuild-register build.ts",
     "build:types": "tsc --declaration --emitDeclarationOnly --declarationDir './dist'",
     "prettier": "prettier --check . --ignore-path .gitignore",
     "prettier:fix": "npm run prettier -- --write",

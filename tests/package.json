@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "query-weaver": "file:.."
+  }
+}
