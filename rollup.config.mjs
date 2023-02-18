@@ -17,7 +17,7 @@ export default [
     plugins: [
       babel({
         extensions,
-        babelHelpers: 'bundled'
+        babelHelpers: "bundled",
       }),
       typescript({
         declaration: true,
@@ -26,7 +26,7 @@ export default [
       }),
     ],
 
-    external: ['pg-escape']
+    external: ["pg-escape"],
   },
 
   {
@@ -36,13 +36,13 @@ export default [
       format: "es",
       exports: "named",
       sourcemap: true,
-      entryFileNames: '[name].mjs',
+      entryFileNames: "[name].mjs",
     },
 
     plugins: [
       babel({
         extensions,
-        babelHelpers: 'bundled'
+        babelHelpers: "bundled",
       }),
       typescript({
         declaration: true,
@@ -51,6 +51,6 @@ export default [
       }),
     ],
 
-    external: ['pg-escape']
+    external: ["pg-escape"],
   },
 ];
