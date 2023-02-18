@@ -8,24 +8,25 @@ Compose SQL statements safely by leveraging template string literals
 $ npm install query-weaver
 ```
 
-
 ## Usage
 
 ### As a SQL Builder
+
 ```js
-import { sql } from 'query-weaver';
-import pg from 'pg';
+import { sql } from "query-weaver";
+import pg from "pg";
 
-const foo = 1, bar = 'Bar';
-const query = sql`SELECT * FROM foobar WHERE foo = ${ foo } AND bar = ${ bar }`;
+const foo = 1,
+  bar = "Bar";
+const query = sql`SELECT * FROM foobar WHERE foo = ${foo} AND bar = ${bar}`;
 
-console.log(query.toString())
+console.log(query.toString());
 // SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'
 
 const db = new pg.Pool();
 const { rows } = await db.query(query);
 
-console.log(rows)
+console.log(rows);
 // [ { foo: 1, bar: 'Bar' } ]
 
 console.log(JSON.stringify(query, null, 2));
@@ -44,16 +45,18 @@ db.end();
 As you can see, the query is executed using **placeholder** on the database. This makes string-value concatenation safe.
 You can also get a string embed version of the query, so that you can debug the query easily.
 
-
 ### As a Query Helper (with `node-postgres` for example)
+
 ```js
-import { useQueryHelper } from 'query-weaver';
-import pg from 'pg';
+import { useQueryHelper } from "query-weaver";
+import pg from "pg";
 
 const db = useQueryHelper(new pg.Pool());
 
-const foo = 1, bar = 'Bar';
-const { rows } = await db.query`SELECT * FROM foobar WHERE foo = ${ foo } AND bar = ${ bar }`;
+const foo = 1,
+  bar = "Bar";
+const { rows } =
+  await db.query`SELECT * FROM foobar WHERE foo = ${foo} AND bar = ${bar}`;
 
 console.log(rows);
 // [ { foo: 1, bar: 'Bar' } ]
@@ -63,8 +66,8 @@ db.end(); // this call will be proxied to the original pg.Pool() instance
 
 Almost the same as above, but you can directly pass the template string to the `query` function.
 
-
 ### WHERE builder
+
 ```js
 import { sql, WHERE, OR } from 'query-weaver';
 
@@ -89,18 +92,19 @@ console.log(q.embed);
 // SELECT * FROM foobar WHERE ((a = '10') AND (b = 'string') AND (c IS UNKNOWN) AND (d BETWEEN '1' AND '5') AND (e IS NULL) AND (f IN (ARRAY['1','2','3','4','5'])))
 ```
 
-
 ### JSON builder
+
 ```js
-import pg from 'pg';
-import { useQueryHelper, json } from 'query-weaver';
+import pg from "pg";
+import { useQueryHelper, json } from "query-weaver";
 
 const db = useQueryHelper(new pg.Pool());
 
 const id = 10;
-const obj = { b: 'string', c: [1, 2, 'X'], d: { e: null, f: undefined } }
+const obj = { b: "string", c: [1, 2, "X"], d: { e: null, f: undefined } };
 
-const row = await db.getRow`SELECT * FROM jsonb_to_record(${json`{ "a": ${ obj }, "b": ${id} }`}) AS (a jsonb, b int);`
+const row =
+  await db.getRow`SELECT * FROM jsonb_to_record(${json`{ "a": ${obj}, "b": ${id} }`}) AS (a jsonb, b int);`;
 
 console.log(row);
 // {
@@ -111,16 +115,16 @@ console.log(row);
 db.end();
 ```
 
-
 ### VALUES builder
+
 `buildValues` (or `sql.values`)
 
 ```js
 sql.values([[ ... values ], ...]);  // => VALUES (...), (...), ...
 ```
 
-
 ### Simple INSERT builder and executor
+
 `buildInsert` (or `sql.insert`) and `insert` executor
 
 ```js
@@ -132,18 +136,20 @@ sql.insert(tableName, [{ ... fieldValuePairs }, ... ]);  // => sql`INSERT INTO .
 db.insert(tableName, [{ ... fieldValuePairs }, ... ]);   // => db.query`INSERT INTO ... VALUES (...), (...), ...`
 ```
 
-
 ### Simple UPDATE builder and executor
+
 `buildUpdate` (or `sql.update`) and `update` executor
+
 ```js
-sql.update(tableName, { ... fieldValuePairs }, { ... whereCondition });  // => sql`UPDATE ...`
-db.update(tableName, { ... fieldValuePairs }, { ... whereCondition });   // => db.query`UPDATE ...`
+sql.update(tableName, { ...fieldValuePairs }, { ...whereCondition }); // => sql`UPDATE ...`
+db.update(tableName, { ...fieldValuePairs }, { ...whereCondition }); // => db.query`UPDATE ...`
 ```
 
-
 ### Simple DELETE builder and executor
+
 `buildDelete` (or `sql.delete`) and `delete` executor
+
 ```js
-sql.delete(tableName, { ... whereCondition });  // => sql`DELETE FROM ...`
-db.delete(tableName, { ... whereCondition });   // => db.query`DELETE FROM ...`
+sql.delete(tableName, { ...whereCondition }); // => sql`DELETE FROM ...`
+db.delete(tableName, { ...whereCondition }); // => db.query`DELETE FROM ...`
 ```
