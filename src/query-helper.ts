@@ -1,6 +1,6 @@
 import type pg from 'pg';
-import type { QueryFragment, FieldValues, WhereArg } from './query-weaver';
-import { sql, buildInsert, buildUpdate, buildDelete } from './query-weaver';
+import type { QueryFragment, FieldValues, WhereArg } from './query-weaver.js';
+import { sql, buildInsert, buildUpdate, buildDelete } from './query-weaver.js';
 
 type pgQueryResultCustom<R> = {
   rowCount: number;
@@ -10,7 +10,7 @@ type pgQueryResultCustom<R> = {
 type pgQueryResult<R> = Omit<Partial<pg.QueryResult>, keyof pgQueryResultCustom<R>> & pgQueryResultCustom<R>;
 
 export interface Queryable {
-  query: <T extends pg.QueryResultRow>(query: { text: string, values?: unknown[] }) => Promise<pgQueryResult<T>> // & Record<string, any>>
+  query: <T extends pg.QueryResultRow>(queryConfig: { text: string, values?: unknown[] }) => Promise<pgQueryResult<T>> // & Record<string, any>>
 }
 
 type QueryHelperOptions = {
@@ -21,7 +21,7 @@ type QueryHelperOptions = {
 }
 
 type QueryTemplateArgs = [text: TemplateStringsArray, ...values: unknown[]];
-type QueryTemplateAwareArgs = QueryTemplateArgs | [query: string | QueryFragment, values?: unknown[]]
+type QueryTemplateOrSimpleQuery = QueryTemplateArgs | [query: string, values?: unknown[]] | [query: pg.QueryConfig<unknown[]>];
 const isQueryTemplateArgs = (args: unknown): args is QueryTemplateArgs => {
   if (!Array.isArray(args)) return false;
   if (typeof args?.[0] !== 'object' || args[0] === null || !('raw' in args[0])) return false;
@@ -42,36 +42,29 @@ export class QueryHelper {
     this.#opts = opts;
   }
 
-  #parseTemplateArgs(args: QueryTemplateAwareArgs): [string | QueryFragment, unknown[]] {
+  #parseQueryTemplateArgs(args: QueryTemplateOrSimpleQuery): pg.QueryConfig<unknown[]> {
     if (isQueryTemplateArgs(args)) {
       const [texts, ...values] = args;
-      return [sql(texts, ...values), []];
+      return sql(texts, ...values);
     }
 
     const [query, values] = args;
-    return [query, values ?? []]
+
+    if (typeof query === 'object' && query && 'text' in query) {
+      return query;
+    }
+
+    return { text: query, values: values ?? [] };
   }
 
-  async #query<T extends pg.QueryResultRow = any>(args: QueryTemplateAwareArgs) {
-    const [query, values] = this.#parseTemplateArgs(args);
+  async #query<T extends pg.QueryResultRow = any>(args: QueryTemplateOrSimpleQuery) {
+    const query = this.#parseQueryTemplateArgs(args);
 
-    const valueFn = (v: unknown) => (this.#opts?.placeHolderFn ?? ((v: unknown, values: unknown[]) => {
-      // default function
-      values.push(v);
-      return `$${values.length}`;
-    }))(v, values);
+    this.#opts?.beforeQuery?.(query);
 
-    const ctx = {
-      text: query.toString({ valueFn }),
-      values,
-      embed: query.toString()
-    };
+    const result = await this.#db.query<T>(query);
 
-    this.#opts?.beforeQuery?.(ctx);
-
-    const result = await this.#db.query<T>(ctx);
-
-    this.#opts?.afterQuery?.({ ... ctx, result });
+    this.#opts?.afterQuery?.({ ... query, result });
 
     return result;
   }
@@ -97,29 +90,26 @@ export class QueryHelper {
     return await this.#query<T>([query]);
   }
 
-  async query<T extends pg.QueryResultRow = any>(text: TemplateStringsArray, ...values: unknown[]): Promise<pgQueryResult<T>>;
-  async query<T extends pg.QueryResultRow = any>(text: string, values?: unknown[]): Promise<pgQueryResult<T>>;
-  async query<T extends pg.QueryResultRow = any>(query: QueryFragment, values?: unknown[]): Promise<pgQueryResult<T>>;
-  async query<T extends pg.QueryResultRow = any>(...args: QueryTemplateAwareArgs) {
+  async query<T extends pg.QueryResultRow = any>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query<T>(args);
   }
 
-  async getRows<T extends pg.QueryResultRow = any>(...args: QueryTemplateAwareArgs) {
+  async getRows<T extends pg.QueryResultRow = any>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query<T>(args).then(x => x.rows);
   }
 
-  async getRow<T extends pg.QueryResultRow = any>(...args: QueryTemplateAwareArgs) {
+  async getRow<T extends pg.QueryResultRow = any>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query<T>(args).then(x => x.rows?.[0]);
   }
 
-  async getOne<T = unknown>(...args: QueryTemplateAwareArgs) {
+  async getOne<T = unknown>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query(args).then(x => Object.values(x.rows?.[0])?.[0] as T)
   }
 
-  async getCount(...args: QueryTemplateAwareArgs) {
+  async getCount(...args: QueryTemplateOrSimpleQuery) {
     return this.#query(args).then(x => x.rowCount)
   }
-  async exec(...args: QueryTemplateAwareArgs) {
+  async exec(...args: QueryTemplateOrSimpleQuery) {
     // same as getCount
     return this.#query(args).then(x => x.rowCount)
   }

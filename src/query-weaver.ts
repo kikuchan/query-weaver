@@ -13,52 +13,109 @@ export function pgIdent(s: string) {
 export function pgString(s: unknown): string {
   if (s === null) return 'NULL';
   if (typeof s === 'boolean') return s ? 'true' : 'false';
-  if (Array.isArray(s)) return pgescape.literal('{' + s.join(',') + '}');
+  if (Array.isArray(s)) return 'ARRAY[' + s.map(pgString).join(',') + ']';
   if (typeof s === 'object') return pgescape.literal(JSON.stringify(s));
   return pgescape.literal(String(s));
 }
 
 type QueryFragmentToStringOptions = { valueFn?: EscapeFunction, identFn?: EscapeFunction };
 
-class QueryFragmentValue {
+export interface QueryFragment {
+  text: string;
+  values?: unknown[];
+  embed?: string;
+  sql?: string;
+
+  toString(opts?: QueryFragmentToStringOptions): string;
+}
+
+class QueryFragmentBase implements QueryFragment {
+  // XXX: entries for defineProperties
+  text: string = ''
+  values?: unknown[] | undefined = []
+  embed?: string = ''
+
+  get compiled() {
+    const values = [] as unknown[];
+    const text  = this.toString({ valueFn: (x: unknown) => { values.push(x); return `$${values.length}`; } });
+    const embed = this.toString();
+
+    return {
+      text,
+      values,
+      embed,
+    }
+  }
+
+  constructor () {
+    Object.defineProperties(this, {
+      text: {
+        enumerable: true,
+        get () { return this.compiled.text },
+      },
+      values: {
+        enumerable: true,
+        get () { return this.compiled.values },
+      },
+      embed: {
+        enumerable: true,
+        get () { return this.compiled.embed },
+      },
+    });
+  }
+
+  toString(_?: QueryFragmentToStringOptions): string {
+    throw new Error("ERROR: Cannot use QueryFragmentBase directly");
+  }
+}
+
+class QueryFragmentValue extends QueryFragmentBase {
   #value: unknown;
 
   constructor (value: unknown) {
+    super();
     this.#value = value;
   }
 
   toString(opts?: QueryFragmentToStringOptions) {
     return (opts?.valueFn ?? pgString)(this.#value);
   }
-
-  toJSON () { return this.toString() }
 }
 
-class QueryFragmentIdent {
+class QueryFragmentIdent extends QueryFragmentBase {
   #ident: string;
 
   constructor (ident: string) {
+    super();
     this.#ident = ident;
   }
 
   toString(opts?: QueryFragmentToStringOptions) {
     return (opts?.identFn ?? pgIdent)(this.#ident);
   }
-
-  toJSON () { return this.toString() }
 }
 
 // we exploits String constructor
-class QueryFragmentString extends String {};
+class QueryFragmentRawString extends QueryFragmentBase {
+  #string: string;
 
-export type QueryFragment = QueryFragmentString | QueryFragmentValue | QueryFragmentIdent | QueryFragments
+  constructor(s: string) {
+    super();
+    this.#string = s;
+  }
+
+  toString(_?: QueryFragmentToStringOptions) {
+    return this.#string;
+  }
+}
+
 export function isQueryFragment(x: unknown): x is QueryFragment {
-  return x instanceof QueryFragmentString || x instanceof QueryFragmentValue || x instanceof QueryFragmentIdent || x instanceof QueryFragments;
+  return x instanceof QueryFragmentBase;
 }
 
 function sewTextsAndValues<T = unknown, R = unknown>(texts: TemplateStringsArray, values: R[], hook: (value: unknown) => T = ((x: unknown) => x as T)) {
   if (texts.length - 1 !== values.length) throw new Error("Invalid call of the function");
-  return texts.flatMap((text, idx) => idx ? [hook(values[idx - 1]), new QueryFragmentString(text)] : [new QueryFragmentString(text)]);
+  return texts.flatMap((text, idx) => idx ? [hook(values[idx - 1]), new QueryFragmentRawString(text)] : [new QueryFragmentRawString(text)]);
 }
 
 const value = (x: unknown) => {
@@ -78,11 +135,12 @@ type QueryFragmentsOptions = {
 
 const isTemplateStringsArray = (x: unknown): x is TemplateStringsArray => (typeof x === 'object' && x !== null && 'raw' in x);
 
-class QueryFragments {
+class QueryFragments extends QueryFragmentBase {
   #list: QueryFragment[] = [];
   #opts: Required<QueryFragmentsOptions>;
 
   constructor(...args: [] | [texts: TemplateStringsArray, values: unknown[], opts?: QueryFragmentsOptions] | [values: unknown[], opts?: QueryFragmentsOptions] | [opts?: QueryFragmentsOptions]) {
+    super();
     this.#opts = { prefix: '', glue: '', suffix: '', empty: '', makeFragmentFn: value, wrapperFn: x => x };
 
     if (isTemplateStringsArray(args[0])) {
@@ -105,9 +163,10 @@ class QueryFragments {
   }
 
   push(v: QueryFragment | string | undefined) {
-    if (typeof v === 'undefined') return this;
-    if (typeof v === 'string') v = raw(v)
-    this.#list.push(v);
+    if (typeof v !== 'undefined') {
+      if (typeof v === 'string') v = raw(v)
+      this.#list.push(v);
+    }
     return this;
   }
 
@@ -120,14 +179,10 @@ class QueryFragments {
     if (this.#list.length === 0) return this.#opts.empty;
     return this.#opts.prefix + this.#opts.wrapperFn(this.#list.map(x => x.toString(opts)).join(this.#opts.glue), opts) + this.#opts.suffix;
   }
-
-  toJSON () { return this.toString() }
 }
 
-export function sql(text: string): QueryFragmentString;
-export function sql(texts: TemplateStringsArray, ...args: unknown[]): QueryFragments;
-export function sql(texts: TemplateStringsArray | string, ... args: unknown[]) {
-  if (typeof texts === 'string') return new QueryFragmentString(texts);
+export function sql(texts: TemplateStringsArray | string, ... args: unknown[]): QueryFragments {
+  if (typeof texts === 'string') return new QueryFragments([texts, ... args]);
   return new QueryFragments(texts, args);
 }
 
