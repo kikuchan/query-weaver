@@ -194,8 +194,8 @@ export function json(...args: [json: unknown] | [texts: TemplateStringsArray, ..
     const [texts, ...values] = args;
 
     return new QueryFragments(texts, values, {
-      wrapperFn: (x: string, opts?: QueryFragmentToStringOptions) => opts?.valueFn?.(x) ?? x, // make it string value
-      makeFragmentFn: (x: unknown) => raw(JSON.stringify(x)), // no escape while in the JSON
+      wrapperFn: (x: string, opts?: QueryFragmentToStringOptions) => opts?.valueFn?.(x) ?? x, // stringify at last
+      makeFragmentFn: (x: unknown) => raw(JSON.stringify(x)), // no escape
     });
   }
 
@@ -208,15 +208,12 @@ export function buildClauses(...args: WhereArg[]) {
   const clauses = new QueryFragments();
 
   const parse = function (val: WhereArg) {
-    // 配列、もしくは、直接指定された場合
     if (val === undefined) return ;
     if (val === null) return ;
     if (typeof val === 'string') { clauses.push(raw(val)); return ; }
     if (isQueryFragment(val)) { clauses.push(val); return ; }
     if (Array.isArray(val)) { val.forEach(parse); return ; }
 
-    // オブジェクトは、対応表として扱う
-    // XXX: 仕様が分かりづらい... ?
     if (typeof val === 'object') {
       for (const key in val) {
         if (val[key] === undefined) continue;
