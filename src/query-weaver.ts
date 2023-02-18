@@ -224,7 +224,6 @@ class QueryFragments extends QueryFragmentBase {
 
   push(...args: (QueryFragment | string | undefined)[]) {
     this.#list.push(
-      ...this.#list,
       ...args.flatMap((v) =>
         typeof v === "undefined" ? [] : [typeof v === "string" ? raw(v) : v]
       )
