@@ -2,6 +2,13 @@
 
 Compose SQL statements safely by leveraging template string literals
 
+## Install
+
+```sh
+$ npm install query-weaver
+```
+
+
 ## Usage
 
 ### As a SQL Builder
