@@ -110,9 +110,11 @@ db.end();
 ```js
 sql.insert(tableName, { ... fieldValuePairs });  // => sql`INSERT INTO ...`
 db.insert(tableName, { ... fieldValuePairs });   // => db.query`INSERT INTO ...`
-```
 
-NB: Bulk insert is not supported yet
+// bulk insert
+sql.insert(tableName, [{ ... fieldValuePairs }, ... ]);  // => sql`INSERT INTO ... VALUES (...), (...), ...`
+db.insert(tableName, [{ ... fieldValuePairs }, ... ]);   // => db.query`INSERT INTO ... VALUES (...), (...), ...`
+```
 
 ### Simple UPDATE helper and executor
 `buildUpdate` (or `sql.update`) and `update`

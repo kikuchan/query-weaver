@@ -261,20 +261,32 @@ export function WHERE_OR(...fv: WhereArg[]) {
   return buildClauses(fv).setSewingPattern('WHERE ((', ') OR (', '))', '');
 }
 
-export function buildInsert(table: string, fv: FieldValues) {
-  const keys = new QueryFragments();
-  const holders = new QueryFragments();
+export function buildValues(args: unknown[][]) {
+  if (args.length === 0) throw new Error("Invalid call of the function");
 
-  for (const key in fv) {
-    const val = fv[key];
-
-    if (val === undefined) continue;
-
-    keys.push(ident(key));
-    holders.push(value(val));
+  const sig = args[0].length;
+  if (args.some(arg => arg.length !== sig)) {
+    throw new Error("buildValues array must all be the same length");
   }
 
-  return sql`INSERT INTO ${ident(table)} (${ keys.join(', ') }) VALUES (${ holders.join(', ') })`;
+  const values = new QueryFragments(args.map(v => new QueryFragments(v.map(value)).join(', '))).setSewingPattern('(', '), (', ')');
+  return sql`VALUES ${ values }`;
+}
+
+export function buildInsert(table: string, fvs: FieldValues[] | FieldValues) {
+  if (!Array.isArray(fvs)) fvs = [fvs];
+  if (fvs.length == 0) throw new Error("Invalid call of the function");
+
+  const ks = Object.keys(fvs[0]);
+  const sig = ks.join();
+  if (fvs.some(fv => Object.keys(fv).join() !== sig)) {
+    throw new Error("buildInsert: All objects must have the same key");
+  }
+
+  const keys = new QueryFragments(ks.map(ident)).join(', ');
+  const values = buildValues(fvs.map(Object.values));
+
+  return sql`INSERT INTO ${ident(table)} (${ keys }) ${ values }`;
 }
 
 export function buildUpdate(table: string, fv: FieldValues, where?: WhereArg) {
@@ -293,7 +305,6 @@ export function buildUpdate(table: string, fv: FieldValues, where?: WhereArg) {
 export function buildDelete(table: string, where?: WhereArg) {
   return sql`DELETE FROM ${ident(table)} ${WHERE(where)}`;
 }
-
 
 // aliases
 export const or = OR;
@@ -320,10 +331,11 @@ sql.or = or;
 sql.insert = buildInsert;
 sql.update = buildUpdate;
 sql.delete = buildDelete;
+sql.values = buildValues;
 
 export default {
   sql, raw, ident, json,
   WHERE, WHERE_AND, WHERE_OR, AND, OR,
   where, where_and, where_or, and, or,
-  buildInsert, buildUpdate, buildDelete
+  buildInsert, buildUpdate, buildDelete, buildValues
 };
