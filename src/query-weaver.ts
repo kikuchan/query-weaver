@@ -160,12 +160,14 @@ class QueryFragments extends QueryFragmentBase {
     return this;
   }
 
-  push(v: QueryFragment | string | undefined) {
-    if (typeof v !== 'undefined') {
-      if (typeof v === 'string') v = raw(v)
-      this.#list.push(v);
-    }
+  push(...args: (QueryFragment | string | undefined)[]) {
+    this.#list.push.apply(this.#list, args.flatMap(v => typeof v === 'undefined' ? [] : [typeof v === 'string' ? raw(v) : v]));
     return this;
+  }
+
+  // alias
+  append(...args: (QueryFragment | string | undefined)[]) {
+    return this.push(...args);
   }
 
   join(glue: string = '') {
