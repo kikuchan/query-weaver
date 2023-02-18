@@ -104,7 +104,16 @@ console.log(row);
 db.end();
 ```
 
-### Simple INSERT helper and executor
+
+### VALUES builder
+`buildValues` (or `sql.values`)
+
+```js
+sql.values([[ ... values ], ...]);  // => VALUES (...), (...), ...
+```
+
+
+### Simple INSERT builder and executor
 `buildInsert` (or `sql.insert`) and `insert` executor
 
 ```js
@@ -116,15 +125,17 @@ sql.insert(tableName, [{ ... fieldValuePairs }, ... ]);  // => sql`INSERT INTO .
 db.insert(tableName, [{ ... fieldValuePairs }, ... ]);   // => db.query`INSERT INTO ... VALUES (...), (...), ...`
 ```
 
-### Simple UPDATE helper and executor
-`buildUpdate` (or `sql.update`) and `update`
+
+### Simple UPDATE builder and executor
+`buildUpdate` (or `sql.update`) and `update` executor
 ```js
 sql.update(tableName, { ... fieldValuePairs }, { ... whereCondition });  // => sql`UPDATE ...`
 db.update(tableName, { ... fieldValuePairs }, { ... whereCondition });   // => db.query`UPDATE ...`
 ```
 
-### Simple DELETE helper and executor
-`buildDelete` (or `sql.delete`) and `delete`
+
+### Simple DELETE builder and executor
+`buildDelete` (or `sql.delete`) and `delete` executor
 ```js
 sql.delete(tableName, { ... whereCondition });  // => sql`DELETE FROM ...`
 db.delete(tableName, { ... whereCondition });   // => db.query`DELETE FROM ...`
