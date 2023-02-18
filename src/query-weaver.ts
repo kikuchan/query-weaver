@@ -180,7 +180,7 @@ class QueryFragments extends QueryFragmentBase {
 }
 
 export function sql(texts: TemplateStringsArray | string, ... args: unknown[]): QueryFragments {
-  if (typeof texts === 'string') return new QueryFragments([texts, ... args]);
+  if (typeof texts === 'string') return new QueryFragments([new QueryFragmentRawString(texts), ... args]);
   return new QueryFragments(texts, args);
 }
 
@@ -220,7 +220,7 @@ export function buildClauses(...args: WhereArg[]) {
         if (val[key] === undefined) continue;
 
         if (isQueryFragment(val[key])) {
-          clauses.push(val[key] as QueryFragment); // XXX:
+          clauses.push(sql`${ident(key)} ${val[key]}`);
           continue;
         }
 
