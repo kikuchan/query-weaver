@@ -29,7 +29,7 @@ export interface QueryFragment {
   toString(opts?: QueryFragmentToStringOptions): string;
 }
 
-class QueryFragmentBase implements QueryFragment {
+abstract class QueryFragmentBase implements QueryFragment {
   // XXX: entries for defineProperties
   text: string = ''
   values?: unknown[] | undefined = []
@@ -64,9 +64,7 @@ class QueryFragmentBase implements QueryFragment {
     });
   }
 
-  toString(_?: QueryFragmentToStringOptions): string {
-    throw new Error("ERROR: Cannot use QueryFragmentBase directly");
-  }
+  abstract toString(opts?: QueryFragmentToStringOptions): string;
 }
 
 class QueryFragmentValue extends QueryFragmentBase {
@@ -304,6 +302,24 @@ export const where = WHERE;
 export const WHERE_AND = WHERE;
 export const where_and = WHERE;
 export const where_or = WHERE_OR;
+
+// expose via `sql`
+sql.raw = raw;
+sql.ident = ident;
+sql.json = json;
+sql.WHERE = WHERE;
+sql.WHERE_AND = WHERE_AND;
+sql.WHERE_OR = WHERE_OR;
+sql.AND = AND;
+sql.OR = OR;
+sql.where = where;
+sql.where_and = where_and;
+sql.where_or = where_or;
+sql.and = and;
+sql.or = or;
+sql.insert = buildInsert;
+sql.update = buildUpdate;
+sql.delete = buildDelete;
 
 export default {
   sql, raw, ident, json,

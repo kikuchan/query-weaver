@@ -34,8 +34,8 @@ console.log(JSON.stringify(query, null, 2));
 db.end();
 ```
 
-As you can see, the query is executed using **placeholder** for the database. This makes string-value concatenation safe.
-You can also get a string embed version of the query if you want.
+As you can see, the query is executed using **placeholder** on the database. This makes string-value concatenation safe.
+You can also get a string embed version of the query, so that you can debug the query easily.
 
 
 ### As a Query Helper (with `node-postgres` for example)
@@ -89,25 +89,25 @@ db.end();
 ```
 
 ### Simple INSERT helper and executor
-`buildInsert` and `insert` executor
+`buildInsert` (or `sql.insert`) and `insert` executor
 
 ```js
-buildInsert(tableName, { ... fieldValuePairs }); // => sql`INSERT INTO ...`
+sql.insert(tableName, { ... fieldValuePairs });  // => sql`INSERT INTO ...`
 db.insert(tableName, { ... fieldValuePairs });   // => db.query`INSERT INTO ...`
 ```
 
 NB: Bulk insert is not supported yet
 
 ### Simple UPDATE helper and executor
-`buildUpdate` and `update`
+`buildUpdate` (or `sql.update`) and `update`
 ```js
-buildUpdate(tableName, { ... fieldValuePairs }, { ... whereCondition }); // => sql`UPDATE ...`
+sql.update(tableName, { ... fieldValuePairs }, { ... whereCondition });  // => sql`UPDATE ...`
 db.update(tableName, { ... fieldValuePairs }, { ... whereCondition });   // => db.query`UPDATE ...`
 ```
 
 ### Simple DELETE helper and executor
-`buildDelete` and `delete`
+`buildDelete` (or `sql.delete`) and `delete`
 ```js
-buildDelete(tableName, { ... whereCondition }); // => sql`DELETE FROM ...`
+sql.delete(tableName, { ... whereCondition });  // => sql`DELETE FROM ...`
 db.delete(tableName, { ... whereCondition });   // => db.query`DELETE FROM ...`
 ```
