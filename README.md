@@ -69,22 +69,28 @@ Almost the same as above, but you can directly pass the template string to the `
 ### WHERE builder
 
 ```js
-import { sql, WHERE, OR } from 'query-weaver';
+import { sql, WHERE, OR } from "query-weaver";
 
-const a = 1, b = "string", c = null, d = 5, e = false;
-console.log(String(sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`));
+const a = 1,
+  b = "string",
+  c = null,
+  d = 5,
+  e = false;
+console.log(
+  String(sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`)
+);
 // SELECT * FROM foobar WHERE ((a = '1') AND (b = 'string') AND (c IS NULL) AND (((d = '5') OR (e = false))))
 
 const q = sql`SELECT * FROM foobar ${WHERE(
   {
     a: 10,
-    b: 'string',
+    b: "string",
     c: sql`IS UNKNOWN`,
-    d: sql`BETWEEN ${a} AND ${d}`
+    d: sql`BETWEEN ${a} AND ${d}`,
   },
-  "e IS NULL"
-  sql`f IN (${f})`,
-)}`
+  "e IS NULL",
+  sql`f IN (${f})`
+)}`;
 console.log(q.text);
 // SELECT * FROM foobar WHERE ((a = $1) AND (b = $2) AND (c IS UNKNOWN) AND (d BETWEEN $3 AND $4) AND (e IS NULL) AND (f IN ($5)))
 
