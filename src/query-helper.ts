@@ -17,8 +17,9 @@ export interface Queryable {
 type QueryHelperOptions = {
   placeHolderFn?: (v: unknown, values: unknown[]) => string
 
-  beforeQuery?: (ctx: any) => any
-  afterQuery?: (ctx: any) => any
+  beforeQuery?: <T extends pg.QueryConfig<unknown[]>>(ctx: T) => any
+  afterQuery?: <T extends pg.QueryConfig<unknown[]>>(ctx: T) => any
+  onError?: <T extends pg.QueryConfig<unknown[]>>(ctx: T, e: Error) => any
 }
 
 type QueryTemplateArgs = [text: TemplateStringsArray, ...values: unknown[]];
@@ -63,7 +64,10 @@ export class QueryHelper {
 
     this.#opts?.beforeQuery?.(query);
 
-    const result = await this.#db.query<T>(query);
+    const result = await this.#db.query<T>(query).catch(e => {
+      this.#opts?.onError?.(query, e);
+      throw e;
+    });
 
     this.#opts?.afterQuery?.({ ... query, result });
 
