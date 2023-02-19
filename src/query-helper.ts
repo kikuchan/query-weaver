@@ -169,7 +169,7 @@ export function useQueryHelper<T extends Queryable>(
       const value = target && Reflect.get(target, key);
 
       if (value && value instanceof Function) {
-        return function(this: unknown, ...args: unknown[]) {
+        return function (this: unknown, ...args: unknown[]) {
           return value.apply(this === receiver ? target : this, args);
         };
       }

@@ -287,7 +287,7 @@ export function json(
 export function buildClauses(...args: WhereArg[]) {
   const clauses = new QueryFragments();
 
-  const parse = function(val: WhereArg) {
+  const parse = function (val: WhereArg) {
     if (val === undefined) return;
     if (val === null) return;
     if (typeof val === 'string') {
