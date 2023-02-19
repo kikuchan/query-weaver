@@ -70,12 +70,12 @@ test('where', async () => {
       d: sql`BETWEEN ${a} AND ${d}`,
     },
     'e IS NULL',
-    sql`f IN (${f})`
+    sql`f = ANY (${f})`
   )}`;
   expect(q.text).toBe(
-    'SELECT * FROM foobar WHERE ((a = $1) AND (b = $2) AND (c IS UNKNOWN) AND (d BETWEEN $3 AND $4) AND (e IS NULL) AND (f IN ($5)))'
+    'SELECT * FROM foobar WHERE ((a = $1) AND (b = $2) AND (c IS UNKNOWN) AND (d BETWEEN $3 AND $4) AND (e IS NULL) AND (f = ANY ($5)))'
   );
   expect(q.embed).toBe(
-    "SELECT * FROM foobar WHERE ((a = '10') AND (b = 'string') AND (c IS UNKNOWN) AND (d BETWEEN '1' AND '5') AND (e IS NULL) AND (f IN (ARRAY['1','2','3','4','5'])))"
+    "SELECT * FROM foobar WHERE ((a = '10') AND (b = 'string') AND (c IS UNKNOWN) AND (d BETWEEN '1' AND '5') AND (e IS NULL) AND (f = ANY (ARRAY['1','2','3','4','5'])))"
   );
 });
