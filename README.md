@@ -160,3 +160,27 @@ db.update(tableName, { ...fieldValuePairs }, { ...whereCondition }); // => db.qu
 sql.delete(tableName, { ...whereCondition }); // => sql`DELETE FROM ...`
 db.delete(tableName, { ...whereCondition }); // => db.query`DELETE FROM ...`
 ```
+
+### Caveats
+
+The actual SQL statement executed on the database may differ between `[.text, .values]` and `.embed`, due to differences in serialize functions.
+If you really want to get the exact same statement, you can try this for example:
+
+```js
+import pgUtil from 'pg/lib/utils.js';
+import pgEscape from 'pg-escape';
+
+console.log(sql`SELECT ${[1, 2, 3, 4, 5]}`.embed);
+// SELECT ARRAY['1','2','3','4','5']
+
+console.log(sql`SELECT ${pgUtil.prepareValue([1, 2, 3, 4, 5])}`.embed);
+// SELECT '{"1","2","3","4","5"}'
+
+// or, pass a custom serialize function
+console.log(
+  sql`SELECT ${[1, 2, 3, 4, 5]}`.toString({
+    valueFn: (x) => pgEscape.literal(JSON.stringify(x)),
+  })
+);
+// SELECT '[1,2,3,4,5]'
+```
