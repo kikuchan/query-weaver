@@ -21,10 +21,11 @@
     "build": "npm run clean && npm run build:esbuild && npm run build:types",
     "build:esbuild": "node -r esbuild-register build.ts",
     "build:types": "tsc --declaration --emitDeclarationOnly --declarationDir './dist'",
-    "prettier": "prettier --check . --ignore-path .gitignore",
-    "prettier:fix": "npm run prettier -- --write",
+    "format": "prettier --check . --ignore-path .gitignore",
+    "format:fix": "npm run format -- --write",
     "lint": "eslint src --ext .ts --ignore-path .gitignore",
     "lint:fix": "npm run lint -- --fix",
+    "type-check": "tsc --noEmit -p tsconfig.json",
     "prepare": "husky install"
   },
   "author": "kikuchan98@gmail.com",
