@@ -3,7 +3,11 @@ module.exports = {
     node: true,
   },
   parser: '@typescript-eslint/parser',
-  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'prettier',
+  ],
   plugins: ['@typescript-eslint'],
   rules: {
     '@typescript-eslint/no-inferrable-types': 'off',
@@ -14,8 +18,6 @@ module.exports = {
     'no-unused-vars': 'off', // covered by "@typescript-eslint/no-unused-vars"
 
     'comma-dangle': ['error', 'always-multiline'],
-    semi: ['error', 'always'],
-    quotes: ['error', 'single'],
     camelcase: 'off',
     'space-before-function-paren': [
       'error',
