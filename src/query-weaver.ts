@@ -2,7 +2,12 @@ import pgescape from 'pg-escape';
 
 type EscapeFunction = (v: unknown) => string;
 export type FieldValues = Record<string, unknown>;
-export type WhereArg = string | FieldValues | QueryFragment | undefined | WhereArg[];
+export type WhereArg =
+  | string
+  | FieldValues
+  | QueryFragment
+  | undefined
+  | WhereArg[];
 
 export function pgIdent(s: string) {
   // '.' is a special for us
@@ -134,9 +139,12 @@ function sewTextsAndValues<T = unknown, R = unknown>(
   values: R[],
   hook: (value: unknown) => T = (x: unknown) => x as T
 ) {
-  if (texts.length - 1 !== values.length) throw new Error('Invalid call of the function');
+  if (texts.length - 1 !== values.length)
+    throw new Error('Invalid call of the function');
   return texts.flatMap((text, idx) =>
-    idx ? [hook(values[idx - 1]), new QueryFragmentRawString(text)] : [new QueryFragmentRawString(text)]
+    idx
+      ? [hook(values[idx - 1]), new QueryFragmentRawString(text)]
+      : [new QueryFragmentRawString(text)]
   );
 }
 
@@ -165,7 +173,11 @@ class QueryFragments extends QueryFragmentBase {
   constructor(
     ...args:
       | []
-      | [texts: TemplateStringsArray, values: unknown[], opts?: QueryFragmentsOptions]
+      | [
+          texts: TemplateStringsArray,
+          values: unknown[],
+          opts?: QueryFragmentsOptions
+        ]
       | [values: unknown[], opts?: QueryFragmentsOptions]
       | [opts?: QueryFragmentsOptions]
   ) {
@@ -188,7 +200,10 @@ class QueryFragments extends QueryFragmentBase {
       this.#opts = { ...this.#opts, ...opts };
       this.#list = sewTextsAndValues(texts, values, this.#opts.makeFragmentFn);
     } else if (Array.isArray(args[0])) {
-      const [values, opts] = args as [values: unknown[], opts?: QueryFragmentsOptions];
+      const [values, opts] = args as [
+        values: unknown[],
+        opts?: QueryFragmentsOptions
+      ];
       this.#opts = { ...this.#opts, ...opts };
       this.#list = values.map((v) => this.#opts.makeFragmentFn(v));
     } else {
@@ -197,13 +212,22 @@ class QueryFragments extends QueryFragmentBase {
     }
   }
 
-  setSewingPattern(prefix: string = '', glue: string = '', suffix: string = '', empty: string = '') {
+  setSewingPattern(
+    prefix: string = '',
+    glue: string = '',
+    suffix: string = '',
+    empty: string = ''
+  ) {
     this.#opts = { ...this.#opts, prefix, glue, suffix, empty };
     return this;
   }
 
   push(...args: (QueryFragment | string | undefined)[]) {
-    this.#list.push(...args.flatMap((v) => (typeof v === 'undefined' ? [] : [typeof v === 'string' ? raw(v) : v])));
+    this.#list.push(
+      ...args.flatMap((v) =>
+        typeof v === 'undefined' ? [] : [typeof v === 'string' ? raw(v) : v]
+      )
+    );
     return this;
   }
 
@@ -221,26 +245,36 @@ class QueryFragments extends QueryFragmentBase {
     if (this.#list.length === 0) return this.#opts.empty;
     return (
       this.#opts.prefix +
-      this.#opts.wrapperFn(this.#list.map((x) => x.toString(opts)).join(this.#opts.glue), opts) +
+      this.#opts.wrapperFn(
+        this.#list.map((x) => x.toString(opts)).join(this.#opts.glue),
+        opts
+      ) +
       this.#opts.suffix
     );
   }
 }
 
-export function sql(texts: TemplateStringsArray | string, ...args: unknown[]): QueryFragments {
-  if (typeof texts === 'string') return new QueryFragments([new QueryFragmentRawString(texts), ...args]);
+export function sql(
+  texts: TemplateStringsArray | string,
+  ...args: unknown[]
+): QueryFragments {
+  if (typeof texts === 'string')
+    return new QueryFragments([new QueryFragmentRawString(texts), ...args]);
   return new QueryFragments(texts, args);
 }
 
 export const raw = sql; // just an alias
 export const ident = (name: string) => new QueryFragmentIdent(name);
 
-export function json(...args: [json: unknown] | [texts: TemplateStringsArray, ...args: unknown[]]) {
+export function json(
+  ...args: [json: unknown] | [texts: TemplateStringsArray, ...args: unknown[]]
+) {
   if (isTemplateStringsArray(args[0])) {
     const [texts, ...values] = args;
 
     return new QueryFragments(texts, values, {
-      wrapperFn: (x: string, opts?: QueryFragmentToStringOptions) => opts?.valueFn?.(x) ?? x, // stringify at last
+      wrapperFn: (x: string, opts?: QueryFragmentToStringOptions) =>
+        opts?.valueFn?.(x) ?? x, // stringify at last
       makeFragmentFn: (x: unknown) => raw(JSON.stringify(x)), // no escape
     });
   }
@@ -323,11 +357,9 @@ export function buildValues(args: unknown[][]) {
     throw new Error('buildValues array must all be the same length');
   }
 
-  const values = new QueryFragments(args.map((v) => new QueryFragments(v.map(value)).join(', '))).setSewingPattern(
-    '(',
-    '), (',
-    ')'
-  );
+  const values = new QueryFragments(
+    args.map((v) => new QueryFragments(v.map(value)).join(', '))
+  ).setSewingPattern('(', '), (', ')');
   return sql`VALUES ${values}`;
 }
 

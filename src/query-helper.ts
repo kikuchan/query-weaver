@@ -8,10 +8,17 @@ type pgQueryResultCustom<R> = {
   rows: R[];
   fields?: Partial<pg.FieldDef>[];
 };
-type pgQueryResult<R> = Omit<Partial<pg.QueryResult>, keyof pgQueryResultCustom<R>> & pgQueryResultCustom<R>;
+type pgQueryResult<R> = Omit<
+  Partial<pg.QueryResult>,
+  keyof pgQueryResultCustom<R>
+> &
+  pgQueryResultCustom<R>;
 
 export interface Queryable {
-  query: <T extends pg.QueryResultRow>(queryConfig: { text: string; values?: unknown[] }) => Promise<pgQueryResult<T>>;
+  query: <T extends pg.QueryResultRow>(queryConfig: {
+    text: string;
+    values?: unknown[];
+  }) => Promise<pgQueryResult<T>>;
 }
 
 type QueryHelperOptions = {
@@ -30,7 +37,8 @@ type QueryTemplateOrSimpleQuery =
 
 const isQueryTemplateArgs = (args: unknown): args is QueryTemplateArgs => {
   if (!Array.isArray(args)) return false;
-  if (typeof args?.[0] !== 'object' || args[0] === null || !('raw' in args[0])) return false;
+  if (typeof args?.[0] !== 'object' || args[0] === null || !('raw' in args[0]))
+    return false;
   if (!Array.isArray(args[0])) return false;
   const [texts, ...values] = args;
   return texts.length - 1 === values.length;
@@ -48,7 +56,9 @@ export class QueryHelper {
     this.#opts = opts;
   }
 
-  #parseQueryTemplateArgs(args: QueryTemplateOrSimpleQuery): pg.QueryConfig<unknown[]> {
+  #parseQueryTemplateArgs(
+    args: QueryTemplateOrSimpleQuery
+  ): pg.QueryConfig<unknown[]> {
     if (isQueryTemplateArgs(args)) {
       const [texts, ...values] = args;
       return sql(texts, ...values);
@@ -81,7 +91,11 @@ export class QueryHelper {
   // ==================================================================================================
   // query executors
 
-  async insert<T extends pg.QueryResultRow>(table: string, fv: FieldValues, followingSql?: string | QueryFragment) {
+  async insert<T extends pg.QueryResultRow>(
+    table: string,
+    fv: FieldValues,
+    followingSql?: string | QueryFragment
+  ) {
     const query = buildInsert(table, fv);
     if (followingSql) query.push('\n').push(followingSql);
     return await this.#query<T>([query]);
@@ -98,21 +112,31 @@ export class QueryHelper {
     return await this.#query<T>([query]);
   }
 
-  async delete<T extends pg.QueryResultRow>(table: string, where: WhereArg, followingSql?: string | QueryFragment) {
+  async delete<T extends pg.QueryResultRow>(
+    table: string,
+    where: WhereArg,
+    followingSql?: string | QueryFragment
+  ) {
     const query = buildDelete(table, where);
     if (followingSql) query.push('\n').push(followingSql);
     return await this.#query<T>([query]);
   }
 
-  async query<T extends pg.QueryResultRow>(...args: QueryTemplateOrSimpleQuery) {
+  async query<T extends pg.QueryResultRow>(
+    ...args: QueryTemplateOrSimpleQuery
+  ) {
     return this.#query<T>(args);
   }
 
-  async getRows<T extends pg.QueryResultRow>(...args: QueryTemplateOrSimpleQuery) {
+  async getRows<T extends pg.QueryResultRow>(
+    ...args: QueryTemplateOrSimpleQuery
+  ) {
     return this.#query<T>(args).then((x) => x.rows);
   }
 
-  async getRow<T extends pg.QueryResultRow>(...args: QueryTemplateOrSimpleQuery) {
+  async getRow<T extends pg.QueryResultRow>(
+    ...args: QueryTemplateOrSimpleQuery
+  ) {
     return this.#query<T>(args).then((x) => x.rows?.[0]);
   }
 

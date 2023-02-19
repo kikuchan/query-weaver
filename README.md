@@ -55,7 +55,8 @@ const db = useQueryHelper(new pg.Pool());
 
 const foo = 1,
   bar = 'Bar';
-const { rows } = await db.query`SELECT * FROM foobar WHERE foo = ${foo} AND bar = ${bar}`;
+const { rows } =
+  await db.query`SELECT * FROM foobar WHERE foo = ${foo} AND bar = ${bar}`;
 
 console.log(rows);
 // [ { foo: 1, bar: 'Bar' } ]
@@ -76,7 +77,9 @@ const a = 1,
   d = 5,
   e = false,
   f = [1, 2, 3, 4, 5];
-console.log(String(sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`));
+console.log(
+  String(sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`)
+);
 // SELECT * FROM foobar WHERE ((a = '1') AND (b = 'string') AND (c IS NULL) AND (((d = '5') OR (e = false))))
 
 const q = sql`SELECT * FROM foobar ${WHERE(
@@ -107,7 +110,8 @@ const db = useQueryHelper(new pg.Pool());
 const id = 10;
 const obj = { b: 'string', c: [1, 2, 'X'], d: { e: null, f: undefined } };
 
-const row = await db.getRow`SELECT * FROM jsonb_to_record(${json`{ 'a': ${obj}, 'b': ${id} }`}) AS (a jsonb, b int);`;
+const row =
+  await db.getRow`SELECT * FROM jsonb_to_record(${json`{ 'a': ${obj}, 'b': ${id} }`}) AS (a jsonb, b int);`;
 
 console.log(row);
 // {

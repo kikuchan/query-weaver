@@ -11,8 +11,12 @@ test('simple', async () => {
   const foo = 1,
     bar = 'Bar';
   const query = sql`SELECT * FROM foobar WHERE foo = ${foo} AND bar = ${bar}`;
-  expect(query.toString()).toBe("SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'");
-  expect(query.embed).toBe("SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'");
+  expect(query.toString()).toBe(
+    "SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'"
+  );
+  expect(query.embed).toBe(
+    "SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'"
+  );
   expect(query.text).toBe('SELECT * FROM foobar WHERE foo = $1 AND bar = $2');
   expect(query.values).toEqual([1, 'Bar']);
 });
@@ -23,7 +27,9 @@ test('simple: and, or', async () => {
     c = null,
     d = 5,
     e = false;
-  const query = String(sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`);
+  const query = String(
+    sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`
+  );
   expect(query).toBe(
     "SELECT * FROM foobar WHERE ((a = '1') AND (b = 'string') AND (c IS NULL) AND (((d = '5') OR (e = false))))"
   );
@@ -49,7 +55,9 @@ test('where', async () => {
     d = 5,
     e = false,
     f = [1, 2, 3, 4, 5];
-  const query1 = String(sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`);
+  const query1 = String(
+    sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`
+  );
   expect(query1).toBe(
     "SELECT * FROM foobar WHERE ((a = '1') AND (b = 'string') AND (c IS NULL) AND (((d = '5') OR (e = false))))"
   );
