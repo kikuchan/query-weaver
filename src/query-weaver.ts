@@ -365,7 +365,8 @@ export function buildValues(args: unknown[][]) {
 
 export function buildInsert(table: string, fvs: FieldValues[] | FieldValues) {
   if (!Array.isArray(fvs)) fvs = [fvs];
-  if (fvs.length == 0) throw new Error('Invalid call of the function');
+  if (fvs.length == 0 || !fvs[0] || typeof fvs[0] !== 'object')
+    throw new Error('Invalid call of the function');
 
   const ks = Object.keys(fvs[0]);
   const sig = ks.join();
