@@ -68,6 +68,8 @@ Almost the same as above, but you can directly pass the template string to the `
 
 ### WHERE builder
 
+`WHERE_AND` / `WHERE_OR` / `AND` / `OR` / `WHERE` (`WHERE_AND` alias)
+
 ```js
 import { sql, WHERE, OR } from 'query-weaver';
 
@@ -124,15 +126,23 @@ db.end();
 
 ### VALUES builder
 
-`buildValues` (or `sql.values`)
+`buildValues` / `sql.values`
 
 ```js
-sql.values([[ ... values ], ...]);  // => VALUES (...), (...), ...
+sql.values([[1, 2, 3], ...]);  // => VALUES (1, 2, 3), (...), ...
+```
+
+### Raw builder
+
+`raw`
+
+```js
+console.log(sql`SELECT * FROM foobar WHERE ${raw("bar LIKE '%something%'")}`);
 ```
 
 ### Simple INSERT builder and executor
 
-`buildInsert` (or `sql.insert`) and `insert` executor
+`buildInsert` / `sql.insert` builder, and `insert` executor
 
 ```js
 sql.insert(tableName, { ... fieldValuePairs });  // => sql`INSERT INTO ...`
@@ -145,7 +155,7 @@ db.insert(tableName, [{ ... fieldValuePairs }, ... ]);   // => db.query`INSERT I
 
 ### Simple UPDATE builder and executor
 
-`buildUpdate` (or `sql.update`) and `update` executor
+`buildUpdate` / `sql.update` builder, and `update` executor
 
 ```js
 sql.update(tableName, { ...fieldValuePairs }, { ...whereCondition }); // => sql`UPDATE ...`
@@ -154,17 +164,53 @@ db.update(tableName, { ...fieldValuePairs }, { ...whereCondition }); // => db.qu
 
 ### Simple DELETE builder and executor
 
-`buildDelete` (or `sql.delete`) and `delete` executor
+`buildDelete` / `sql.delete` builder, and `delete` executor
 
 ```js
 sql.delete(tableName, { ...whereCondition }); // => sql`DELETE FROM ...`
 db.delete(tableName, { ...whereCondition }); // => db.query`DELETE FROM ...`
 ```
 
+### API
+
+As you can see, an object built and constructed by `sql` keyword behave like a simple object with the following properties;
+`text`, `values`, and `embed`.
+
+Furthermore, the object also comes up with the following APIs;
+
+- `append(...)` / `push(...)`
+  - append raw string or an object created by `sql`, to the query
+- `join(glue = ', ')`
+  - set glue string for toString()
+- `setSewingPattern(prefix, glue, suffix, empty)`
+  - set sewing pattern for toString()
+- `toString(opts?)`
+  - constructs SQL string (by using sewing pattern and `opts` settings)
+
+To create the object;
+
+- `` sql`template string with ${value}` ``
+  - creates a query object with values that will be automatically escaped
+- `sql(value, ...)`
+  - creates a query object from only values that will be automatically escaped
+
+These APIs can be used, for example, to construct `IN` clause;
+
+```js
+console.log(
+  sql`SELECT * FROM foobar WHERE foo IN (${sql(1, 2, 3).join()})`.embed
+);
+// SELECT * FROM foobar WHERE foo IN ('1', '2', '3')
+
+const a = [1, 2, 3];
+console.log(sql`SELECT * FROM foobar WHERE foo IN (${sql(...a).join()})`.text);
+// SELECT * FROM foobar WHERE foo IN ($1, $2, $3)
+```
+
 ### Caveats
 
-The actual SQL statement executed on the database may differ between `[.text, .values]` and `.embed`, due to differences in serialize functions.
-If you really want to get the exact same statement, you can try this for example:
+- Only `sql` and `json` accepts a template string literal.
+- The actual SQL statement executed on the database may differ between `[.text, .values]` and `.embed`, due to differences in serialize functions. If you really want to get the exact same statement, you can try this for example:
 
 ```js
 import pgUtil from 'pg/lib/utils.js';

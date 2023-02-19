@@ -119,9 +119,9 @@ class QueryFragmentIdent extends QueryFragmentBase {
 class QueryFragmentRawString extends QueryFragmentBase {
   #string: string;
 
-  constructor(s: string) {
+  constructor(s: unknown) {
     super();
-    this.#string = s;
+    this.#string = String(s);
   }
 
   /* toString(_?: QueryFragmentToStringOptions) { */
@@ -236,7 +236,7 @@ class QueryFragments extends QueryFragmentBase {
     return this.push(...args);
   }
 
-  join(glue: string = '') {
+  join(glue: string = ', ') {
     this.#opts.glue = glue;
     return this;
   }
@@ -255,15 +255,23 @@ class QueryFragments extends QueryFragmentBase {
 }
 
 export function sql(
-  texts: TemplateStringsArray | string,
-  ...args: unknown[]
+  ...args:
+    | [texts: TemplateStringsArray, ...values: unknown[]]
+    | [...values: unknown[]]
 ): QueryFragments {
-  if (typeof texts === 'string')
-    return new QueryFragments([new QueryFragmentRawString(texts), ...args]);
-  return new QueryFragments(texts, args);
+  if (isTemplateStringsArray(args[0])) {
+    const [texts, ...values] = args;
+    return new QueryFragments(texts, values);
+  }
+
+  // normal function call
+  return new QueryFragments(args);
 }
 
-export const raw = sql; // just an alias
+export function raw(text: string) {
+  return new QueryFragmentRawString(text);
+}
+
 export const ident = (name: string) => new QueryFragmentIdent(name);
 
 export function json(
@@ -287,17 +295,20 @@ export function json(
 export function buildClauses(...args: WhereArg[]) {
   const clauses = new QueryFragments();
 
-  const parse = function (val: WhereArg) {
+  const parse = (val: WhereArg) => {
     if (val === undefined) return;
     if (val === null) return;
+
     if (typeof val === 'string') {
       clauses.push(raw(val));
       return;
     }
+
     if (isQueryFragment(val)) {
       clauses.push(val);
       return;
     }
+
     if (Array.isArray(val)) {
       val.forEach(parse);
       return;
@@ -325,6 +336,7 @@ export function buildClauses(...args: WhereArg[]) {
         // それ以外
         clauses.push(sql`${ident(key)} = ${val[key]}`);
       }
+      return;
     }
   };
 
@@ -357,9 +369,11 @@ export function buildValues(args: unknown[][]) {
     throw new Error('buildValues array must all be the same length');
   }
 
-  const values = new QueryFragments(
-    args.map((v) => new QueryFragments(v.map(value)).join(', '))
-  ).setSewingPattern('(', '), (', ')');
+  const values = sql(...args.map((v) => sql(...v).join(', '))).setSewingPattern(
+    '(',
+    '), (',
+    ')'
+  );
   return sql`VALUES ${values}`;
 }
 
@@ -374,7 +388,7 @@ export function buildInsert(table: string, fvs: FieldValues[] | FieldValues) {
     throw new Error('buildInsert: All objects must have the same key');
   }
 
-  const keys = new QueryFragments(ks.map(ident)).join(', ');
+  const keys = sql(...ks.map(ident)).join(', ');
   const values = buildValues(fvs.map(Object.values));
 
   return sql`INSERT INTO ${ident(table)} (${keys}) ${values}`;
