@@ -51,6 +51,9 @@ test('json', async () => {
 
   expect(json(obj).text).toBe('$1');
   expect(json(obj).values).toEqual([JSON.stringify(obj)]);
+  expect(json([obj]).text).toBe('$1');
+  expect(json([obj]).values).toEqual([JSON.stringify([obj])]);
+  expect(json([obj, obj.d]).values).toEqual([JSON.stringify([obj, obj.d])]);
 
   expect(JSON.parse(json`{"a":"foo", "b": ${[1, 2, 3]}}`.values[0])).toEqual({
     a: 'foo',
@@ -95,5 +98,17 @@ test('where', async () => {
   );
   expect(q.embed).toBe(
     "SELECT * FROM foobar WHERE ((a = '10') AND (b = 'string') AND (c IS UNKNOWN) AND (d BETWEEN '1' AND '5') AND (e IS NULL) AND (f = ANY (ARRAY['1','2','3','4','5'])))"
+  );
+});
+
+test('utils', async () => {
+  const obj = { a: 1, b: 2, c: '3' };
+
+  expect(sql.keys(obj).text).toBe('(a, b, c)');
+  expect(sql.keys([obj, obj]).text).toBe('(a, b, c)');
+  expect(sql.values(obj).text).toBe('VALUES ($1, $2, $3)');
+  expect(sql.values(obj).values).toEqual([1, 2, '3']);
+  expect(sql.values([obj, obj]).embed).toBe(
+    "VALUES ('1', '2', '3'), ('1', '2', '3')"
   );
 });
