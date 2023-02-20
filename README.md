@@ -12,12 +12,12 @@ $ npm install query-weaver
 
 ### As a SQL Builder
 
+<!-- prettier-ignore -->
 ```js
 import { sql } from 'query-weaver';
 import pg from 'pg';
 
-const foo = 1,
-  bar = 'Bar';
+const foo = 1, bar = 'Bar';
 const query = sql`SELECT * FROM foobar WHERE foo = ${foo} AND bar = ${bar}`;
 
 console.log(query.toString());
@@ -47,14 +47,14 @@ You can also get a string embed version of the query, so that you can debug the 
 
 ### As a Query Helper (with `node-postgres` for example)
 
+<!-- prettier-ignore -->
 ```js
 import { useQueryHelper } from 'query-weaver';
 import pg from 'pg';
 
 const db = useQueryHelper(new pg.Pool());
 
-const foo = 1,
-  bar = 'Bar';
+const foo = 1, bar = 'Bar';
 const { rows } =
   await db.query`SELECT * FROM foobar WHERE foo = ${foo} AND bar = ${bar}`;
 
@@ -70,15 +70,11 @@ Almost the same as above, but you can directly pass the template string to the `
 
 `WHERE_AND` / `WHERE_OR` / `AND` / `OR` / `WHERE` (`WHERE_AND` alias)
 
+<!-- prettier-ignore -->
 ```js
 import { sql, WHERE, OR } from 'query-weaver';
 
-const a = 1,
-  b = 'string',
-  c = null,
-  d = 5,
-  e = false,
-  f = [1, 2, 3, 4, 5];
+const a = 1, b = 'string', c = null, d = 5, e = false, f = [1, 2, 3, 4, 5];
 console.log(
   String(sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`)
 );
@@ -189,7 +185,7 @@ As you can see, an object built and constructed by `sql` keyword behave like a s
 Furthermore, the object also comes up with the following APIs;
 
 - `append(...)` / `push(...)`
-  - append raw string or an object created by `sql`, to the query
+  - append a **raw SQL string** or an object created by `sql`, to the query
 - `join(glue = ', ')` / `prefix(prefix)` / `suffix(suffix)` / `empty(empty)`
   - set glue/prefix/suffix/empty string for toString(), respectively
 - `setSewingPattern(prefix, glue, suffix, empty)`
@@ -239,4 +235,71 @@ console.log(
   })
 );
 // SELECT '[1,2,3,4,5]'
+```
+
+### DEBUG
+
+You can get access to the statements and results when using the Query Helper.
+I use the following code to record the session;
+
+<!-- prettier-ignore -->
+```js
+import zlib from 'node:zlib'
+
+const db = useQueryHelper(new pg.Pool(), {
+  onError: (ctx, error) => console.error(JSON.stringify({ error: zlib.gzipSync(JSON.stringify({ ... ctx, error })).toString('base64') })),
+  beforeQuery: (ctx) => console.log(JSON.stringify({ query: zlib.gzipSync(JSON.stringify(ctx)).toString('base64') })),
+  afterQuery: (ctx) => console.log(JSON.stringify({ query: zlib.gzipSync(JSON.stringify(ctx)).toString('base64') })),
+});
+```
+
+After that, you'll see something like this on the console;
+
+<!-- prettier-ignore -->
+```json
+{"query":"H4sIAAAAAAAAA6tWKkmtKFGyUgp29XF1DlHQUnAL8vdVSMvPT0osUgj3cA1yBXEUbBVUDJV0lMoSc0pTi5Wsog1jdZRSc5NSU4jRqm6oDtRblFpcmlMC1FytlJyfm5uYh9ALks0vd84vzQM6xRDMAVlSrQTUDxYAmghU7AQka2NrawEDVej4tQAAAA=="}
+```
+
+Now you can extract the contents by executing the following command;
+
+<!-- prettier-ignore -->
+```sh
+% echo '... base64part' | base64 -d | zcat | jq -r .
+
+# or if you're using X11, select base64 part and then;
+% xclip -o | base64 -d | zcat | jq -r .
+```
+
+<!-- prettier-ignore -->
+```json
+{
+  "text": "SELECT * FROM foobar WHERE foo = $1",
+  "values": [
+    1
+  ],
+  "embed": "SELECT * FROM foobar WHERE foo = '1'",
+  "results": {
+    "command": "SELECT",
+    "rowCount": 1,
+    "rows": [
+      {
+        "foo": 1,
+        "bar": "Bar"
+      }
+    ]
+  }
+}
+```
+
+It is very handy to replay the session like this;
+
+```sh
+% xclip -o | base64 -d | zcat | jq -r .embed | psql
+ foo | bar
+-----+-----
+   1 | Bar
+(1 row)
+
+# Or, you can make a shell-script named `xclip-query` then
+% xclip-query .embed | psql
 ```

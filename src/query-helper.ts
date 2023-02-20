@@ -45,6 +45,20 @@ type QueryTemplateOrSimpleQuery =
   | [query: string, values?: unknown[]]
   | [query: pg.QueryConfig<unknown[]>];
 
+function hidePropertyExcludes(target: object, keys: string[]) {
+  target = { ...target };
+  Object.defineProperties(
+    target,
+    Object.fromEntries(
+      Object.keys(target).map((k) => [
+        k,
+        keys.includes(k) ? {} : { enumerable: false },
+      ])
+    )
+  );
+  return target;
+}
+
 /**
  * Query Helper
  */
@@ -79,14 +93,17 @@ export class QueryHelper {
 
     this.#opts?.beforeQuery?.(query);
 
-    const result = await this.#db.query<T>(query).catch((e) => {
+    const results = await this.#db.query<T>(query).catch((e) => {
       this.#opts?.onError?.(query, e);
       throw e;
     });
 
-    this.#opts?.afterQuery?.({ ...query, result });
+    this.#opts?.afterQuery?.({
+      ...query,
+      results: hidePropertyExcludes(results, ['command', 'rowCount', 'rows']),
+    });
 
-    return result;
+    return results;
   }
 
   // ==================================================================================================

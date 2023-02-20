@@ -451,7 +451,7 @@ export function buildInsert(
   const values = buildValues(fvs.map(Object.values));
 
   return sql`INSERT INTO ${makeIdent(table)} ${keys} ${values}`
-    .append(makeRaw(appendix))
+    .append(appendix)
     .join(' ');
 }
 
@@ -471,7 +471,7 @@ export function buildUpdate(
   }
 
   return sql`UPDATE ${makeIdent(table)} SET ${pairs.join(', ')} ${WHERE(where)}`
-    .append(makeRaw(appendix))
+    .append(appendix)
     .join(' ');
 }
 

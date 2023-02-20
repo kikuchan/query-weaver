@@ -1,5 +1,6 @@
 const { sql, useQueryHelper, json, WHERE, OR } = require('query-weaver');
 
+// mock
 const queryable = {
   async query(cfg) {
     return { rows: [{ text: cfg.text, values: cfg.values }], rowCount: 1 };
