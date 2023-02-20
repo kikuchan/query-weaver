@@ -33,8 +33,6 @@ export interface Queryable {
 }
 
 type QueryHelperOptions = {
-  placeHolderFn?: (v: unknown, values: unknown[]) => string;
-
   beforeQuery?: <T extends pg.QueryConfig<unknown[]>>(ctx: T) => void;
   afterQuery?: <T extends pg.QueryConfig<unknown[]>>(ctx: T) => void;
   onError?: <T extends pg.QueryConfig<unknown[]>>(ctx: T, e: Error) => void;
