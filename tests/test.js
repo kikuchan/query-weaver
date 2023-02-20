@@ -1,4 +1,4 @@
-const { sql, useQueryHelper, json, WHERE, AND, OR } = require('query-weaver');
+const { sql, useQueryHelper, json, WHERE, OR } = require('query-weaver');
 
 const queryable = {
   async query(cfg) {
@@ -21,6 +21,16 @@ test('simple', async () => {
   expect(query.values).toEqual([1, 'Bar']);
 });
 
+test('simple', async () => {
+  const a = 1,
+    b = 2,
+    c = 3;
+  const query = sql.insert('tableName', { a, b, c }, 'RETURNING *');
+  expect(query.embed).toBe(
+    "INSERT INTO tableName (a, b, c) VALUES ('1', '2', '3') RETURNING *"
+  );
+});
+
 test('simple: and, or', async () => {
   const a = 1,
     b = 'string',
@@ -38,6 +48,14 @@ test('simple: and, or', async () => {
 test('json', async () => {
   const id = 10;
   const obj = { b: 'string', c: [1, 2, 'X'], d: { e: null, f: undefined } };
+
+  expect(json(obj).text).toBe('$1');
+  expect(json(obj).values).toEqual([JSON.stringify(obj)]);
+
+  expect(JSON.parse(json`{"a":"foo", "b": ${[1, 2, 3]}}`.values[0])).toEqual({
+    a: 'foo',
+    b: [1, 2, 3],
+  });
 
   const row1 = await db.getRow(
     sql`SELECT * FROM jsonb_to_record(${json`{ "a": ${obj}, "b": ${id} }`}) AS (a jsonb, b int, c jsonb, d jsonb);`

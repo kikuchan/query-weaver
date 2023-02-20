@@ -1,6 +1,17 @@
 import type pg from 'pg';
-import type { QueryFragment, FieldValues, WhereArg } from './query-weaver';
-import { sql, buildInsert, buildUpdate, buildDelete } from './query-weaver';
+import type {
+  QueryFragment,
+  FieldValues,
+  WhereArg,
+  QueryTemplateStyle,
+} from './query-weaver';
+import {
+  sql,
+  buildInsert,
+  buildUpdate,
+  buildDelete,
+  isQueryTemplateStyle,
+} from './query-weaver';
 
 // pg (almost) compatible types to relief and reduce their requirements
 type pgQueryResultCustom<R> = {
@@ -29,20 +40,10 @@ type QueryHelperOptions = {
   onError?: <T extends pg.QueryConfig<unknown[]>>(ctx: T, e: Error) => void;
 };
 
-type QueryTemplateArgs = [text: TemplateStringsArray, ...values: unknown[]];
 type QueryTemplateOrSimpleQuery =
-  | QueryTemplateArgs
+  | QueryTemplateStyle
   | [query: string, values?: unknown[]]
   | [query: pg.QueryConfig<unknown[]>];
-
-const isQueryTemplateArgs = (args: unknown): args is QueryTemplateArgs => {
-  if (!Array.isArray(args)) return false;
-  if (typeof args?.[0] !== 'object' || args[0] === null || !('raw' in args[0]))
-    return false;
-  if (!Array.isArray(args[0])) return false;
-  const [texts, ...values] = args;
-  return texts.length - 1 === values.length;
-};
 
 /**
  * Query Helper
@@ -56,10 +57,10 @@ export class QueryHelper {
     this.#opts = opts;
   }
 
-  #parseQueryTemplateArgs(
+  #parseQueryTemplateStyle(
     args: QueryTemplateOrSimpleQuery
   ): pg.QueryConfig<unknown[]> {
-    if (isQueryTemplateArgs(args)) {
+    if (isQueryTemplateStyle(args)) {
       const [texts, ...values] = args;
       return sql(texts, ...values);
     }
@@ -74,7 +75,7 @@ export class QueryHelper {
   }
 
   async #query<T extends pg.QueryResultRow>(args: QueryTemplateOrSimpleQuery) {
-    const query = this.#parseQueryTemplateArgs(args);
+    const query = this.#parseQueryTemplateStyle(args);
 
     this.#opts?.beforeQuery?.(query);
 
@@ -94,10 +95,9 @@ export class QueryHelper {
   async insert<T extends pg.QueryResultRow>(
     table: string,
     fv: FieldValues,
-    followingSql?: string | QueryFragment
+    appendix?: string | QueryFragment
   ) {
-    const query = buildInsert(table, fv);
-    if (followingSql) query.push('\n').push(followingSql);
+    const query = buildInsert(table, fv, appendix);
     return await this.#query<T>([query]);
   }
 
@@ -105,20 +105,18 @@ export class QueryHelper {
     table: string,
     fv: FieldValues,
     where: WhereArg,
-    followingSql?: string | QueryFragment
+    appendix?: string | QueryFragment
   ) {
-    const query = buildUpdate(table, fv, where);
-    if (followingSql) query.push('\n').push(followingSql);
+    const query = buildUpdate(table, fv, where, appendix);
     return await this.#query<T>([query]);
   }
 
   async delete<T extends pg.QueryResultRow>(
     table: string,
     where: WhereArg,
-    followingSql?: string | QueryFragment
+    appendix?: string | QueryFragment
   ) {
-    const query = buildDelete(table, where);
-    if (followingSql) query.push('\n').push(followingSql);
+    const query = buildDelete(table, where, appendix);
     return await this.#query<T>([query]);
   }
 

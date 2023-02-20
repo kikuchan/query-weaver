@@ -134,24 +134,25 @@ export function isQueryFragment(x: unknown): x is QueryFragment {
   return x instanceof QueryFragmentBase;
 }
 
-function sewTextsAndValues<T = unknown, R = unknown>(
-  texts: TemplateStringsArray,
-  values: R[],
-  hook: (value: unknown) => T = (x: unknown) => x as T
-) {
-  if (texts.length - 1 !== values.length)
-    throw new Error('Invalid call of the function');
-  return texts.flatMap((text, idx) =>
-    idx
-      ? [hook(values[idx - 1]), new QueryFragmentRawString(text)]
-      : [new QueryFragmentRawString(text)]
-  );
+function makeIdent(name: string) {
+  return new QueryFragmentIdent(name);
 }
 
-const value = (x: unknown) => {
-  if (isQueryFragment(x)) return x; // assume it's already wrapped
+function makeValue(x: unknown): QueryFragment | undefined {
+  if (typeof x === 'undefined' || isQueryFragment(x)) return x;
   return new QueryFragmentValue(x);
-};
+}
+
+function makeRaw(text: unknown | unknown[]): QueryFragment | undefined {
+  if (typeof text === 'undefined' || isQueryFragment(text)) return text;
+  if (Array.isArray(text)) return new QueryFragments(text.map(makeRaw));
+  return new QueryFragmentRawString(text);
+}
+
+function makeJsonValue(x: unknown) {
+  if (typeof x === 'undefined' || isQueryFragment(x)) return x;
+  return makeRaw(JSON.stringify(x));
+}
 
 type QueryFragmentsOptions = {
   prefix?: string;
@@ -159,12 +160,32 @@ type QueryFragmentsOptions = {
   suffix?: string;
   empty?: string;
 
-  makeFragmentFn?: (x: unknown) => QueryFragment;
   wrapperFn?: (s: string, opts?: QueryFragmentToStringOptions) => string;
 };
 
-const isTemplateStringsArray = (x: unknown): x is TemplateStringsArray =>
-  typeof x === 'object' && x !== null && 'raw' in x;
+export type QueryTemplateStyle = [
+  text: TemplateStringsArray,
+  ...values: unknown[]
+];
+export const isQueryTemplateStyle = (
+  args: unknown
+): args is QueryTemplateStyle => {
+  if (!Array.isArray(args)) return false;
+  if (typeof args?.[0] !== 'object' || args[0] === null || !('raw' in args[0]))
+    return false;
+  if (!Array.isArray(args[0])) return false;
+  const [texts, ...values] = args;
+  return texts.length - 1 === values.length;
+};
+
+function sewTemplateTextsAndValues<T = unknown, R = unknown>(
+  texts: T[],
+  values: R[]
+) {
+  if (texts.length - 1 !== values.length)
+    throw new Error('Invalid call of the function');
+  return texts.flatMap((text, idx) => (idx ? [values[idx - 1], text] : [text]));
+}
 
 class QueryFragments extends QueryFragmentBase {
   #list: QueryFragment[] = [];
@@ -173,12 +194,7 @@ class QueryFragments extends QueryFragmentBase {
   constructor(
     ...args:
       | []
-      | [
-          texts: TemplateStringsArray,
-          values: unknown[],
-          opts?: QueryFragmentsOptions
-        ]
-      | [values: unknown[], opts?: QueryFragmentsOptions]
+      | [values: (QueryFragment | undefined)[], opts?: QueryFragmentsOptions]
       | [opts?: QueryFragmentsOptions]
   ) {
     super();
@@ -187,25 +203,16 @@ class QueryFragments extends QueryFragmentBase {
       glue: '',
       suffix: '',
       empty: '',
-      makeFragmentFn: value,
       wrapperFn: (x) => x,
     };
 
-    if (isTemplateStringsArray(args[0])) {
-      const [texts, values, opts] = args as [
-        texts: TemplateStringsArray,
-        values: unknown[],
-        opts?: QueryFragmentsOptions
-      ];
-      this.#opts = { ...this.#opts, ...opts };
-      this.#list = sewTextsAndValues(texts, values, this.#opts.makeFragmentFn);
-    } else if (Array.isArray(args[0])) {
+    if (Array.isArray(args[0])) {
       const [values, opts] = args as [
-        values: unknown[],
+        values: (QueryFragment | undefined)[],
         opts?: QueryFragmentsOptions
       ];
       this.#opts = { ...this.#opts, ...opts };
-      this.#list = values.map((v) => this.#opts.makeFragmentFn(v));
+      this.push(...values);
     } else {
       const [opts] = args as [opts?: QueryFragmentsOptions];
       this.#opts = { ...this.#opts, ...opts };
@@ -224,9 +231,7 @@ class QueryFragments extends QueryFragmentBase {
 
   push(...args: (QueryFragment | string | undefined)[]) {
     this.#list.push(
-      ...args.flatMap((v) =>
-        typeof v === 'undefined' ? [] : [typeof v === 'string' ? raw(v) : v]
-      )
+      ...(args.map(makeRaw).filter((x) => x !== undefined) as QueryFragment[])
     );
     return this;
   }
@@ -238,6 +243,21 @@ class QueryFragments extends QueryFragmentBase {
 
   join(glue: string = ', ') {
     this.#opts.glue = glue;
+    return this;
+  }
+
+  prefix(prefix: string = ' ') {
+    this.#opts.prefix = prefix;
+    return this;
+  }
+
+  suffix(suffix: string = ' ') {
+    this.#opts.suffix = suffix;
+    return this;
+  }
+
+  empty(empty: string = '') {
+    this.#opts.empty = empty;
     return this;
   }
 
@@ -259,37 +279,60 @@ export function sql(
     | [texts: TemplateStringsArray, ...values: unknown[]]
     | [...values: unknown[]]
 ): QueryFragments {
-  if (isTemplateStringsArray(args[0])) {
-    const [texts, ...values] = args;
-    return new QueryFragments(texts, values);
+  let fragments: (QueryFragment | undefined)[];
+  if (isQueryTemplateStyle(args)) {
+    // sql`...` comes here
+    const [texts, ...values] = args as [
+      texts: TemplateStringsArray,
+      values: unknown[]
+    ];
+    // template string looks like a single QueryFragment for user
+    fragments = [
+      new QueryFragments(
+        sewTemplateTextsAndValues(texts.map(makeRaw), values.map(makeValue))
+      ),
+    ];
+  } else {
+    // normal function call
+    fragments = args.map(makeValue);
   }
 
-  // normal function call
-  return new QueryFragments(args);
+  return new QueryFragments(fragments);
 }
 
-export function raw(text: string) {
-  return new QueryFragmentRawString(text);
-}
+export const ident = makeIdent;
 
-export const ident = (name: string) => new QueryFragmentIdent(name);
+export function raw(...args: unknown[]) {
+  return new QueryFragments(args.map(makeRaw));
+}
 
 export function json(
-  ...args: [json: unknown] | [texts: TemplateStringsArray, ...args: unknown[]]
+  ...args:
+    | [...json: unknown[]]
+    | [texts: TemplateStringsArray, ...args: unknown[]]
 ) {
-  if (isTemplateStringsArray(args[0])) {
+  let fragments: (QueryFragment | undefined)[];
+  const wrapperFn = (x: string, opts?: QueryFragmentToStringOptions) =>
+    (opts?.valueFn || pgString)(x);
+  if (isQueryTemplateStyle(args)) {
     const [texts, ...values] = args;
-
-    return new QueryFragments(texts, values, {
-      wrapperFn: (x: string, opts?: QueryFragmentToStringOptions) =>
-        opts?.valueFn?.(x) ?? x, // stringify at last
-      makeFragmentFn: (x: unknown) => raw(JSON.stringify(x)), // no escape
-    });
+    fragments = [
+      new QueryFragments(
+        sewTemplateTextsAndValues(
+          texts.map(makeRaw),
+          values.map(makeJsonValue)
+        ),
+        { wrapperFn }
+      ),
+    ];
+  } else {
+    // normal function call
+    fragments = args.map(
+      (x) => new QueryFragments([makeJsonValue(x)], { wrapperFn })
+    );
   }
 
-  const [obj] = args;
-  if (isQueryFragment(obj)) return obj; // assume it's already wrapped
-  return sql`${JSON.stringify(obj)}`;
+  return new QueryFragments(fragments);
 }
 
 export function buildClauses(...args: WhereArg[]) {
@@ -300,7 +343,7 @@ export function buildClauses(...args: WhereArg[]) {
     if (val === null) return;
 
     if (typeof val === 'string') {
-      clauses.push(raw(val));
+      clauses.push(makeRaw(val));
       return;
     }
 
@@ -319,22 +362,22 @@ export function buildClauses(...args: WhereArg[]) {
         if (val[key] === undefined) continue;
 
         if (isQueryFragment(val[key])) {
-          clauses.push(sql`${ident(key)} ${val[key]}`);
+          clauses.push(sql`${makeIdent(key)} ${val[key]}`);
           continue;
         }
 
         if (val[key] === null) {
-          clauses.push(sql`${ident(key)} IS NULL`);
+          clauses.push(sql`${makeIdent(key)} IS NULL`);
           continue;
         }
 
         if (Array.isArray(val[key])) {
-          clauses.push(sql`${ident(key)} = ANY (${val[key]})`);
+          clauses.push(sql`${makeIdent(key)} = ANY (${val[key]})`);
           continue;
         }
 
         // それ以外
-        clauses.push(sql`${ident(key)} = ${val[key]}`);
+        clauses.push(sql`${makeIdent(key)} = ${val[key]}`);
       }
       return;
     }
@@ -361,23 +404,29 @@ export function WHERE_OR(...fv: WhereArg[]) {
   return buildClauses(fv).setSewingPattern('WHERE ((', ') OR (', '))', '');
 }
 
-export function buildValues(args: unknown[][]) {
-  if (args.length === 0) throw new Error('Invalid call of the function');
+export function buildValues(fvs: (FieldValues | unknown[])[]) {
+  if (!Array.isArray(fvs)) {
+    if (typeof fvs !== 'object')
+      throw new Error('buildValues: The argument must be an array');
+    fvs = [fvs];
+  }
+  if (fvs.length === 0)
+    throw new Error('buildValues: Array must contain elements at least one');
 
-  const sig = args[0].length;
-  if (args.some((arg) => arg.length !== sig)) {
-    throw new Error('buildValues array must all be the same length');
+  const array = fvs.map((x) => (typeof x === 'object' ? Object.values(x) : x));
+
+  const sig = array[0].length;
+  if (array.some((arg) => arg.length !== sig)) {
+    throw new Error('buildValues: Array must all be the same length');
   }
 
-  const values = sql(...args.map((v) => sql(...v).join(', '))).setSewingPattern(
-    '(',
-    '), (',
-    ')'
-  );
+  const values = sql(
+    ...array.map((v) => sql(...v).join(', '))
+  ).setSewingPattern('(', '), (', ')');
   return sql`VALUES ${values}`;
 }
 
-export function buildInsert(table: string, fvs: FieldValues[] | FieldValues) {
+export function buildKeys(fvs: FieldValues[] | FieldValues) {
   if (!Array.isArray(fvs)) fvs = [fvs];
   if (fvs.length == 0 || !fvs[0] || typeof fvs[0] !== 'object')
     throw new Error('Invalid call of the function');
@@ -385,30 +434,55 @@ export function buildInsert(table: string, fvs: FieldValues[] | FieldValues) {
   const ks = Object.keys(fvs[0]);
   const sig = ks.join();
   if (fvs.some((fv) => Object.keys(fv).join() !== sig)) {
-    throw new Error('buildInsert: All objects must have the same key');
+    throw new Error('buildKeys: All objects must have the same key');
   }
 
-  const keys = sql(...ks.map(ident)).join(', ');
-  const values = buildValues(fvs.map(Object.values));
-
-  return sql`INSERT INTO ${ident(table)} (${keys}) ${values}`;
+  return sql(...ks.map(makeIdent)).setSewingPattern('(', ', ', ')');
 }
 
-export function buildUpdate(table: string, fv: FieldValues, where?: WhereArg) {
+export function buildInsert(
+  table: string,
+  fvs: FieldValues[] | FieldValues,
+  appendix?: string | QueryFragment
+) {
+  if (!Array.isArray(fvs)) fvs = [fvs];
+
+  const keys = buildKeys(fvs);
+  const values = buildValues(fvs.map(Object.values));
+
+  return sql`INSERT INTO ${makeIdent(table)} ${keys} ${values}`
+    .append(makeRaw(appendix))
+    .join(' ');
+}
+
+export function buildUpdate(
+  table: string,
+  fv: FieldValues,
+  where?: WhereArg,
+  appendix?: string | QueryFragment
+) {
   const pairs = new QueryFragments();
 
   for (const k in fv) {
     const val = fv[k];
     if (val === undefined) continue;
 
-    pairs.push(sql`${ident(k)} = ${val}`);
+    pairs.push(sql`${makeIdent(k)} = ${val}`);
   }
 
-  return sql`UPDATE ${ident(table)} SET ${pairs.join(', ')} ${WHERE(where)}`;
+  return sql`UPDATE ${makeIdent(table)} SET ${pairs.join(', ')} ${WHERE(where)}`
+    .append(makeRaw(appendix))
+    .join(' ');
 }
 
-export function buildDelete(table: string, where?: WhereArg) {
-  return sql`DELETE FROM ${ident(table)} ${WHERE(where)}`;
+export function buildDelete(
+  table: string,
+  where?: WhereArg,
+  appendix?: string | QueryFragment
+) {
+  return sql`DELETE FROM ${makeIdent(table)} ${WHERE(where)}`
+    .append(appendix)
+    .join(' ');
 }
 
 // aliases
@@ -436,6 +510,7 @@ sql.or = or;
 sql.insert = buildInsert;
 sql.update = buildUpdate;
 sql.delete = buildDelete;
+sql.keys = buildKeys;
 sql.values = buildValues;
 
 export default {
