@@ -129,7 +129,17 @@ db.end();
 `buildValues` / `sql.values`
 
 ```js
-sql.values([[1, 2, 3], ...]);  // => VALUES (1, 2, 3), (...), ...
+sql.values([[1, 2, 3], ...]);              // => VALUES (1, 2, 3), (...), ...
+sql.values([{ a: 1, b: 2, c: 3 }], ...]);  // => VALUES (1, 2, 3), (...), ...
+```
+
+### Key builder
+
+`buildKeys` / `sql.keys`
+
+```js
+sql.keys({ a: 1, b: 2, c: 3 });         // => (a, b, c)
+sql.keys([{ a: 1, b: 2, c: 3 }, ...]);  // => (a, b, c)
 ```
 
 ### Raw builder
@@ -180,18 +190,18 @@ Furthermore, the object also comes up with the following APIs;
 
 - `append(...)` / `push(...)`
   - append raw string or an object created by `sql`, to the query
-- `join(glue = ', ')`
-  - set glue string for toString()
+- `join(glue = ', ')` / `prefix(prefix)` / `suffix(suffix)` / `empty(empty)`
+  - set glue/prefix/suffix/empty string for toString(), respectively
 - `setSewingPattern(prefix, glue, suffix, empty)`
-  - set sewing pattern for toString()
+  - set sewing pattern for toString() at once
 - `toString(opts?)`
   - constructs SQL string (by using sewing pattern and `opts` settings)
 
 To create the object;
 
-- `` sql`template string with ${value}` ``
+- `` sql`template string with ${value}` `` / `` json`{"a": "b", "c": ${value}}` ``
   - creates a query object with values that will be automatically escaped
-- `sql(value, ...)`
+- `sql(value, ...)` / `json(value)`
   - creates a query object from only values that will be automatically escaped
 
 These APIs can be used, for example, to construct `IN` clause;
