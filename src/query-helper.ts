@@ -13,24 +13,27 @@ import {
   isQueryTemplateStyle,
 } from './query-weaver';
 
+export type QueryResultRow = pg.QueryResultRow;
+
 // pg (almost) compatible types to relief and reduce their requirements
-type pgQueryResultCustom<R> = {
+export type QueryResult<T extends QueryResultRow> = {
   rowCount: number;
-  rows: R[];
+  rows: T[];
   fields?: Partial<pg.FieldDef>[];
 };
-type pgQueryResult<R> = Omit<
-  Partial<pg.QueryResult>,
-  keyof pgQueryResultCustom<R>
-> &
-  pgQueryResultCustom<R>;
 
 export interface Queryable {
-  query: <T extends pg.QueryResultRow>(queryConfig: {
+  query: <T extends QueryResultRow>(queryConfig: {
     text: string;
     values?: unknown[];
-  }) => Promise<pgQueryResult<T>>;
+  }) => Promise<QueryResult<T>>;
 }
+
+type pgQueryResult<X extends Queryable, T extends QueryResultRow> = X extends {
+  query(...args: unknown[]): Promise<pg.QueryResult<T>>;
+}
+  ? pg.QueryResult<T>
+  : QueryResult<T>;
 
 type QueryHelperOptions = {
   beforeQuery?: <T extends pg.QueryConfig<unknown[]>>(ctx: T) => void;
@@ -60,11 +63,11 @@ function hidePropertyExcludes(target: object, keys: string[]) {
 /**
  * Query Helper
  */
-export class QueryHelper {
-  #db: Queryable;
+export class QueryHelper<X extends Queryable> {
+  #db: X;
   #opts: QueryHelperOptions;
 
-  constructor(db: Queryable, opts: QueryHelperOptions = {}) {
+  constructor(db: X, opts: QueryHelperOptions = {}) {
     this.#db = db;
     this.#opts = opts;
   }
@@ -86,7 +89,9 @@ export class QueryHelper {
     return { text: query, values: values ?? [] };
   }
 
-  async #query<T extends pg.QueryResultRow>(args: QueryTemplateOrSimpleQuery) {
+  async #query<T extends QueryResultRow>(
+    args: QueryTemplateOrSimpleQuery
+  ): Promise<pgQueryResult<X, T>> {
     const query = this.#parseQueryTemplateStyle(args);
 
     this.#opts?.beforeQuery?.(query);
@@ -101,13 +106,13 @@ export class QueryHelper {
       results: hidePropertyExcludes(results, ['command', 'rowCount', 'rows']),
     });
 
-    return results;
+    return results as pgQueryResult<X, T>;
   }
 
   // ==================================================================================================
   // query executors
 
-  async insert<T extends pg.QueryResultRow>(
+  async insert<T extends QueryResultRow>(
     table: string,
     fv: FieldValues,
     appendix?: string | QueryFragment
@@ -116,7 +121,7 @@ export class QueryHelper {
     return await this.#query<T>([query]);
   }
 
-  async update<T extends pg.QueryResultRow>(
+  async update<T extends QueryResultRow>(
     table: string,
     fv: FieldValues,
     where: WhereArg,
@@ -126,7 +131,7 @@ export class QueryHelper {
     return await this.#query<T>([query]);
   }
 
-  async delete<T extends pg.QueryResultRow>(
+  async delete<T extends QueryResultRow>(
     table: string,
     where: WhereArg,
     appendix?: string | QueryFragment
@@ -135,21 +140,15 @@ export class QueryHelper {
     return await this.#query<T>([query]);
   }
 
-  async query<T extends pg.QueryResultRow>(
-    ...args: QueryTemplateOrSimpleQuery
-  ) {
+  async query<T extends QueryResultRow>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query<T>(args);
   }
 
-  async getRows<T extends pg.QueryResultRow>(
-    ...args: QueryTemplateOrSimpleQuery
-  ) {
+  async getRows<T extends QueryResultRow>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query<T>(args).then((x) => x.rows);
   }
 
-  async getRow<T extends pg.QueryResultRow>(
-    ...args: QueryTemplateOrSimpleQuery
-  ) {
+  async getRow<T extends QueryResultRow>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query<T>(args).then((x) => x.rows?.[0]);
   }
 
@@ -166,6 +165,16 @@ export class QueryHelper {
   }
 }
 
+type Overwrite<T, Q> = Omit<T, keyof Q> & Q;
+type MethodChainRewrite<T, Q> = {
+  [K in keyof T]: T[K] extends (...args: infer R) => T
+    ? (...args: R) => Override<T, Q>
+    : T[K] extends T
+    ? Override<T, Q>
+    : T[K];
+};
+type Override<T, Q> = Overwrite<MethodChainRewrite<T, Q>, Q>;
+
 /**
  * Returns a proxy object that overrides the queryable instance `db` by Query Helper utilities
  * @param db - Queryable object to be wrapped
@@ -173,21 +182,23 @@ export class QueryHelper {
 export function useQueryHelper<T extends Queryable>(
   db: T,
   opts?: QueryHelperOptions
-): Omit<T, keyof QueryHelper> & QueryHelper {
-  const qh = new QueryHelper(db, opts);
-  return new Proxy(db, {
+): Override<T, QueryHelper<T>> {
+  const qh = new QueryHelper<T>(db, opts);
+  const proxy: unknown = new Proxy(db, {
     get(db, key, receiver) {
       const target = key in qh ? qh : key in db ? db : undefined;
-
       const value = target && Reflect.get(target, key);
 
       if (value && value instanceof Function) {
         return function (this: unknown, ...args: unknown[]) {
-          return value.apply(this === receiver ? target : this, args);
+          const result = value.apply(this === receiver ? target : this, args);
+          return result === db ? proxy : result;
         };
       }
 
-      return value;
+      return value === db ? proxy : value;
     },
-  }) as T & QueryHelper;
+  });
+
+  return proxy as Override<T, QueryHelper<T>>;
 }
