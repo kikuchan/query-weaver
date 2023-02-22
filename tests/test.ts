@@ -1,11 +1,11 @@
-import { sql, useQueryHelper, json, WHERE, AND, OR } from 'query-weaver';
+import { sql, withQueryHelper, json, WHERE, AND, OR } from 'query-weaver';
 
 const queryable = {
   async query(cfg: { text: string; values?: unknown[] }): Promise<any> {
     return { rows: [{ text: cfg.text, values: cfg.values }], rowCount: 1 };
   },
 };
-const db = useQueryHelper(queryable); // mock
+const db = withQueryHelper(queryable); // mock
 
 test('simple', async () => {
   const foo = 1,

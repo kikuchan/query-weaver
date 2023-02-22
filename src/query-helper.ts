@@ -179,7 +179,7 @@ type Override<T, Q> = Overwrite<MethodChainRewrite<T, Q>, Q>;
  * Returns a proxy object that overrides the queryable instance `db` by Query Helper utilities
  * @param db - Queryable object to be wrapped
  */
-export function useQueryHelper<T extends Queryable>(
+export function withQueryHelper<T extends Queryable>(
   db: T,
   opts?: QueryHelperOptions
 ): Override<T, QueryHelper<T>> {

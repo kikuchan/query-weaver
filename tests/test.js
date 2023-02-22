@@ -1,4 +1,4 @@
-const { sql, useQueryHelper, json, WHERE, OR } = require('query-weaver');
+const { sql, withQueryHelper, json, WHERE, OR } = require('query-weaver');
 
 // mock
 const queryable = {
@@ -6,7 +6,7 @@ const queryable = {
     return { rows: [{ text: cfg.text, values: cfg.values }], rowCount: 1 };
   },
 };
-const db = useQueryHelper(queryable); // mock
+const db = withQueryHelper(queryable); // mock
 
 test('simple', async () => {
   const foo = 1,

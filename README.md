@@ -49,10 +49,10 @@ You can also get a string embed version of the query, so that you can debug the 
 
 <!-- prettier-ignore -->
 ```js
-import { useQueryHelper } from 'query-weaver';
+import { withQueryHelper } from 'query-weaver';
 import pg from 'pg';
 
-const db = useQueryHelper(new pg.Pool());
+const db = withQueryHelper(new pg.Pool());
 
 const foo = 1, bar = 'Bar';
 const { rows } =
@@ -101,9 +101,9 @@ console.log(q.embed);
 
 ```js
 import pg from 'pg';
-import { useQueryHelper, json } from 'query-weaver';
+import { withQueryHelper, json } from 'query-weaver';
 
-const db = useQueryHelper(new pg.Pool());
+const db = withQueryHelper(new pg.Pool());
 
 const id = 10;
 const obj = { b: 'string', c: [1, 2, 'X'], d: { e: null, f: undefined } };
@@ -246,7 +246,7 @@ I use the following code to record the session;
 ```js
 import zlib from 'node:zlib'
 
-const db = useQueryHelper(new pg.Pool(), {
+const db = withQueryHelper(new pg.Pool(), {
   onError: (ctx, error) => console.error(JSON.stringify({ error: zlib.gzipSync(JSON.stringify({ ... ctx, error })).toString('base64') })),
   beforeQuery: (ctx) => console.log(JSON.stringify({ query: zlib.gzipSync(JSON.stringify(ctx)).toString('base64') })),
   afterQuery: (ctx) => console.log(JSON.stringify({ query: zlib.gzipSync(JSON.stringify(ctx)).toString('base64') })),
