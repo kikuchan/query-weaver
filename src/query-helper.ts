@@ -32,17 +32,9 @@ export type QueryableFunction<T extends object> = (
   queryConfig: QueryConfig
 ) => Promise<QueryResult<QueryResultRow>>;
 
-export type Queryable<T extends object> =
-  | {
-      query: QueryableFunction<T>;
-    }
-  | {
-      $queryRawUnsafe: (
-        this: T,
-        text: string,
-        ...values: unknown[]
-      ) => Promise<QueryResult<QueryResultRow>>;
-    };
+export type Queryable<T extends object> = {
+  query: QueryableFunction<T>;
+};
 
 type pgQueryResult<X, T extends QueryResultRow> = X extends {
   query(...args: unknown[]): Promise<pg.QueryResult<T>>; // pg
@@ -88,30 +80,11 @@ export class QueryHelper<X extends object> {
     this.#db = db;
     this.#opts = opts;
 
+    // set query function
     if (!this.#opts.query) {
-      // set default query function
       if ('query' in db && typeof db.query === 'function') {
-        // node-postgres
+        // default
         this.#opts.query = db.query as QueryableFunction<X>;
-      } else if (
-        '$queryRawUnsafe' in db &&
-        typeof db.$queryRawUnsafe === 'function'
-      ) {
-        // Prisma Client API
-        this.#opts.query = async function ({ text, values }: QueryConfig) {
-          // for types, and to be sure
-          if (
-            '$queryRawUnsafe' in db &&
-            typeof db.$queryRawUnsafe === 'function'
-          ) {
-            const rows = await db.$queryRawUnsafe(text, ...values);
-            return {
-              rows,
-              rowCount: rows.length,
-            };
-          }
-          throw new Error('Invalid call');
-        };
       }
     }
   }
@@ -139,8 +112,7 @@ export class QueryHelper<X extends object> {
     this.#opts?.beforeQuery?.(query);
 
     const queryFn = this.#opts.query;
-    if (!queryFn) throw new Error('No query function is found / provided');
-
+    if (!queryFn) throw new Error('Missing query function');
     const results = await queryFn.call(this.#db, query).catch((e: unknown) => {
       this.#opts?.onError?.(query, e);
       throw e;
