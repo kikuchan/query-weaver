@@ -303,3 +303,47 @@ It is very handy to replay the session like this;
 # Or, you can make a shell-script named `xclip-query` then
 % xclip-query .embed | psql
 ```
+
+### Query Helper with custom `query` handler
+
+The final underlying `query` function can be changed by using `query` option.
+So you can use Prisma, TypeORM, or whatever you want if you write a query handler for them.
+
+Here are examples for using it;
+<!-- prettier-ignore -->
+```js
+const db = withQueryHelper(new PrismaClient(), {
+  query: QueryHelper.prisma,
+});
+
+console.log(await db.query`...`);
+```
+
+<!-- prettier-ignore -->
+```js
+const db = withQueryHelper(new DataSource({ ... }), {
+  query: QueryHelper.typeorm,
+});
+
+console.log(await db.query`...`);
+```
+
+<!-- prettier-ignore -->
+```ts
+const queryable = async function (this: object, { text, values}: QueryConfig) {
+  return {
+    rows: [this], // `this` would be the object you passed to the constructor
+    rowCount: 1,
+  }
+}
+
+const db = withQueryHelper({ some: 'Hello, object' }, {
+  query: queryable,
+});
+
+console.log(await db.getRow`HELLO QUERY`);
+// { some: 'Hello, object' }
+```
+
+That's it!
+Now you can use Query Weaver interfaces on them.

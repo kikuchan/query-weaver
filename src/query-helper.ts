@@ -126,7 +126,7 @@ export class QueryHelper<X extends object> {
     return results as pgQueryResult<X, T>;
   }
 
-  // ==================================================================================================
+  // ======================================================================
   // query executors
 
   async insert<T extends QueryResultRow>(
@@ -180,6 +180,56 @@ export class QueryHelper<X extends object> {
   async exec(...args: QueryTemplateOrSimpleQuery) {
     // same as getCount
     return this.#query(args).then((x) => x.rowCount);
+  }
+
+  // ======================================================================
+  // query adapters
+
+  // Prisma adapter: NB; It only supports a query return rows
+  public static get prisma() {
+    return async function <T extends QueryResultRow> (
+      this: object,
+      { text, values }: QueryConfig
+    ): Promise<QueryResult<T>> {
+      if (
+        '$queryRawUnsafe' in this &&
+        typeof this.$queryRawUnsafe === 'function'
+      ) {
+        const rows: T[] = await this.$queryRawUnsafe(text, ...values);
+        return {
+          rows: rows,
+          rowCount: rows.length,
+        };
+      }
+      throw new Error('Invalid object');
+    };
+  }
+
+  // TypeORM adapter
+  public static get typeorm() {
+    return async function <T extends QueryResultRow> (
+      this: object,
+      { text, values }: QueryConfig
+    ): Promise<QueryResult<T>> {
+      if ('query' in this && typeof this.query === 'function') {
+        const rows: unknown[] = await this.query(text, values);
+
+        // returns with row count
+        if (
+          rows.length === 2 &&
+          Array.isArray(rows[0]) &&
+          typeof rows[1] === 'number'
+        ) {
+          return { rows: rows[0], rowCount: rows[1] };
+        }
+
+        return {
+          rows,
+          rowCount: rows.length,
+        } as { rows: T[]; rowCount: number };
+      }
+      throw new Error('Invalid object');
+    };
   }
 }
 
