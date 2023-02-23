@@ -43,7 +43,7 @@ export interface QueryFragment {
 abstract class QueryFragmentBase implements QueryFragment {
   // XXX: entries for defineProperties
   text: string = '';
-  values?: unknown[] | undefined = [];
+  values: unknown[] = [];
   embed?: string = '';
 
   get compiled() {

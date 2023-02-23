@@ -22,23 +22,40 @@ export type QueryResult<T extends QueryResultRow> = {
   fields?: Partial<pg.FieldDef>[];
 };
 
-export interface Queryable {
-  query: <T extends QueryResultRow>(queryConfig: {
-    text: string;
-    values?: unknown[];
-  }) => Promise<QueryResult<T>>;
-}
+export type QueryConfig = {
+  text: string;
+  values: unknown[];
+};
 
-type pgQueryResult<X extends Queryable, T extends QueryResultRow> = X extends {
-  query(...args: unknown[]): Promise<pg.QueryResult<T>>;
+export type QueryableFunction<T extends object> = (
+  this: T,
+  queryConfig: QueryConfig
+) => Promise<QueryResult<QueryResultRow>>;
+
+export type Queryable<T extends object> =
+  | {
+      query: QueryableFunction<T>;
+    }
+  | {
+      $queryRawUnsafe: (
+        this: T,
+        text: string,
+        ...values: unknown[]
+      ) => Promise<QueryResult<QueryResultRow>>;
+    };
+
+type pgQueryResult<X, T extends QueryResultRow> = X extends {
+  query(...args: unknown[]): Promise<pg.QueryResult<T>>; // pg
 }
   ? pg.QueryResult<T>
   : QueryResult<T>;
 
-type QueryHelperOptions = {
-  beforeQuery?: <T extends pg.QueryConfig<unknown[]>>(ctx: T) => void;
-  afterQuery?: <T extends pg.QueryConfig<unknown[]>>(ctx: T) => void;
-  onError?: <T extends pg.QueryConfig<unknown[]>>(ctx: T, e: Error) => void;
+type QueryHelperOptions<X extends object> = {
+  beforeQuery?: <T extends QueryConfig>(ctx: T) => void;
+  afterQuery?: <T extends QueryConfig>(ctx: T) => void;
+  onError?: <T extends QueryConfig>(ctx: T, e: unknown) => void;
+
+  query?: QueryableFunction<X>;
 };
 
 type QueryTemplateOrSimpleQuery =
@@ -63,18 +80,43 @@ function hidePropertyExcludes(target: object, keys: string[]) {
 /**
  * Query Helper
  */
-export class QueryHelper<X extends Queryable> {
+export class QueryHelper<X extends object> {
   #db: X;
-  #opts: QueryHelperOptions;
+  #opts: QueryHelperOptions<X>;
 
-  constructor(db: X, opts: QueryHelperOptions = {}) {
+  constructor(db: X, opts: QueryHelperOptions<X> = {}) {
     this.#db = db;
     this.#opts = opts;
+
+    if (!this.#opts.query) {
+      // set default query function
+      if ('query' in db && typeof db.query === 'function') {
+        // node-postgres
+        this.#opts.query = db.query as QueryableFunction<X>;
+      } else if (
+        '$queryRawUnsafe' in db &&
+        typeof db.$queryRawUnsafe === 'function'
+      ) {
+        // Prisma Client API
+        this.#opts.query = async function ({ text, values }: QueryConfig) {
+          // for types, and to be sure
+          if (
+            '$queryRawUnsafe' in db &&
+            typeof db.$queryRawUnsafe === 'function'
+          ) {
+            const rows = await db.$queryRawUnsafe(text, ...values);
+            return {
+              rows,
+              rowCount: rows.length,
+            };
+          }
+          throw new Error('Invalid call');
+        };
+      }
+    }
   }
 
-  #parseQueryTemplateStyle(
-    args: QueryTemplateOrSimpleQuery
-  ): pg.QueryConfig<unknown[]> {
+  #parseQueryTemplateStyle(args: QueryTemplateOrSimpleQuery): QueryConfig {
     if (isQueryTemplateStyle(args)) {
       const [texts, ...values] = args;
       return sql(texts, ...values);
@@ -83,7 +125,7 @@ export class QueryHelper<X extends Queryable> {
     const [query, values] = args;
 
     if (typeof query === 'object' && query && 'text' in query) {
-      return query;
+      return { ...query, values: query.values ?? [] };
     }
 
     return { text: query, values: values ?? [] };
@@ -96,7 +138,10 @@ export class QueryHelper<X extends Queryable> {
 
     this.#opts?.beforeQuery?.(query);
 
-    const results = await this.#db.query<T>(query).catch((e) => {
+    const queryFn = this.#opts.query;
+    if (!queryFn) throw new Error('No query function is found / provided');
+
+    const results = await queryFn.call(this.#db, query).catch((e: unknown) => {
       this.#opts?.onError?.(query, e);
       throw e;
     });
@@ -159,6 +204,7 @@ export class QueryHelper<X extends Queryable> {
   async getCount(...args: QueryTemplateOrSimpleQuery) {
     return this.#query(args).then((x) => x.rowCount);
   }
+
   async exec(...args: QueryTemplateOrSimpleQuery) {
     // same as getCount
     return this.#query(args).then((x) => x.rowCount);
@@ -179,9 +225,17 @@ type Override<T, Q> = Overwrite<MethodChainRewrite<T, Q>, Q>;
  * Returns a proxy object that overrides the queryable instance `db` by Query Helper utilities
  * @param db - Queryable object to be wrapped
  */
-export function withQueryHelper<T extends Queryable>(
+export function withQueryHelper<T extends Queryable<T>>(
   db: T,
-  opts?: QueryHelperOptions
+  opts?: QueryHelperOptions<T>
+): Override<T, QueryHelper<T>>;
+export function withQueryHelper<T extends object>(
+  db: T,
+  opts: Overwrite<QueryHelperOptions<T>, Queryable<T>>
+): Override<T, QueryHelper<T>>;
+export function withQueryHelper<T extends object>(
+  db: T,
+  opts?: QueryHelperOptions<T>
 ): Override<T, QueryHelper<T>> {
   const qh = new QueryHelper<T>(db, opts);
   const proxy: unknown = new Proxy(db, {
