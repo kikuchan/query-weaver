@@ -1,6 +1,8 @@
-import { sql, withQueryHelper, json, WHERE, AND, OR } from 'query-weaver';
+import { sql, withQueryHelper, json, WHERE, OR } from '../src';
+import { expect, test } from 'vitest';
 
 const queryable = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async query(cfg: { text: string; values?: unknown[] }): Promise<any> {
     return { rows: [{ text: cfg.text, values: cfg.values }], rowCount: 1 };
   },

@@ -1,4 +1,6 @@
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { sql, withQueryHelper, json, WHERE, OR } = require('query-weaver');
+import { test, expect } from 'vitest';
 
 // mock
 const queryable = {
