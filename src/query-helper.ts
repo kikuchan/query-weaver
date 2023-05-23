@@ -243,6 +243,8 @@ type MethodChainRewrite<T, Q> = {
 };
 type Override<T, Q> = Overwrite<MethodChainRewrite<T, Q>, Q>;
 
+export type WithQueryHelper<T extends object> = Override<T, QueryHelper<T>>;
+
 /**
  * Returns a proxy object that overrides the queryable instance `db` by Query Helper utilities
  * @param db - Queryable object to be wrapped
@@ -250,15 +252,15 @@ type Override<T, Q> = Overwrite<MethodChainRewrite<T, Q>, Q>;
 export function withQueryHelper<T extends Queryable<T>>(
   db: T,
   opts?: QueryHelperOptions<T>
-): Override<T, QueryHelper<T>>;
+): WithQueryHelper<T>;
 export function withQueryHelper<T extends object>(
   db: T,
   opts: Overwrite<QueryHelperOptions<T>, Queryable<T>>
-): Override<T, QueryHelper<T>>;
+): WithQueryHelper<T>;
 export function withQueryHelper<T extends object>(
   db: T,
   opts?: QueryHelperOptions<T>
-): Override<T, QueryHelper<T>> {
+): WithQueryHelper<T> {
   const qh = new QueryHelper<T>(db, opts);
   const proxy: unknown = new Proxy(db, {
     get(db, key, receiver) {
@@ -276,5 +278,5 @@ export function withQueryHelper<T extends object>(
     },
   });
 
-  return proxy as Override<T, QueryHelper<T>>;
+  return proxy as WithQueryHelper<T>;
 }
