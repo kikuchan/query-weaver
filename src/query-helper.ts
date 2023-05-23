@@ -78,7 +78,7 @@ export class QueryHelper<X extends object> {
 
   constructor(db: X, opts: QueryHelperOptions<X> = {}) {
     this.#db = db;
-    this.#opts = opts;
+    this.#opts = { ...opts };
 
     // set query function
     if (!this.#opts.query) {
