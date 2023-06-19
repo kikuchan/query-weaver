@@ -22,7 +22,11 @@ export function pgString(s: unknown): string {
   if (s === null) return 'NULL';
   if (typeof s === 'boolean') return s ? 'true' : 'false';
   if (Array.isArray(s)) return 'ARRAY[' + s.map(pgString).join(',') + ']';
-  if (typeof s === 'object') return pgescape.literal(JSON.stringify(s));
+  if (typeof s === 'object') {
+    if ('toJSON' in s && typeof s.toJSON === 'function')
+      return pgescape.literal(s.toJSON());
+    return pgescape.literal(s.toString());
+  }
   return pgescape.literal(String(s));
 }
 

@@ -310,6 +310,7 @@ The final underlying `query` function can be changed by using `query` option.
 So you can use Prisma, TypeORM, or whatever you want if you write a query handler for them.
 
 Here are examples for using it;
+
 <!-- prettier-ignore -->
 ```js
 const db = withQueryHelper(new PrismaClient(), {
