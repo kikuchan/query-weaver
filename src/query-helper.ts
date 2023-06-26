@@ -170,7 +170,9 @@ export class QueryHelper<X extends object> {
   }
 
   async getOne<T = unknown>(...args: QueryTemplateOrSimpleQuery) {
-    return this.#query(args).then((x) => Object.values(x.rows?.[0])?.[0] as T);
+    return this.#query<[T]>(args).then(
+      (x) => Object.values(x.rows?.[0] ?? {})?.[0] as T | undefined
+    );
   }
 
   async getCount(...args: QueryTemplateOrSimpleQuery) {
