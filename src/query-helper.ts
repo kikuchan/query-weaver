@@ -166,7 +166,7 @@ export class QueryHelper<X extends object> {
   }
 
   async getRow<T extends QueryResultRow>(...args: QueryTemplateOrSimpleQuery) {
-    return this.#query<T>(args).then((x) => x.rows?.[0]);
+    return this.#query<T>(args).then((x) => x.rows?.[0] as T | undefined);
   }
 
   async getOne<T = unknown>(...args: QueryTemplateOrSimpleQuery) {
