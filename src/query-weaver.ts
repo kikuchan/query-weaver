@@ -435,10 +435,14 @@ export function buildKeys(fvs: FieldValues[] | FieldValues) {
   if (fvs.length == 0 || !fvs[0] || typeof fvs[0] !== 'object')
     throw new Error('Invalid call of the function');
 
+  fvs = fvs.map((fv) =>
+    Object.fromEntries(Object.entries(fv).filter(([_, v]) => v !== undefined))
+  );
+
   const ks = Object.keys(fvs[0]);
   const sig = ks.join();
   if (fvs.some((fv) => Object.keys(fv).join() !== sig)) {
-    throw new Error('buildKeys: All objects must have the same key');
+    throw new Error('buildKeys: All objects must have the same keys');
   }
 
   return sql(...ks.map(makeIdent)).setSewingPattern('(', ', ', ')');

@@ -1,4 +1,4 @@
-import { sql, withQueryHelper, json, WHERE, OR } from '../src';
+import { sql, withQueryHelper, json, WHERE, OR, buildInsert } from '../src';
 import { expect, test } from 'vitest';
 
 const queryable = {
@@ -80,4 +80,15 @@ test('where', async () => {
   expect(q.embed).toBe(
     "SELECT * FROM foobar WHERE ((a = '10') AND (b = 'string') AND (c IS UNKNOWN) AND (d BETWEEN '1' AND '5') AND (e IS NULL) AND (f = ANY (ARRAY['1','2','3','4','5'])))"
   );
+});
+
+test('undefined', async () => {
+  const q = buildInsert('test', {
+    a: undefined,
+    b: 10,
+    c: '20',
+  });
+
+  expect(q.text).toBe('INSERT INTO test (b, c) VALUES ($1, $2)');
+  expect(q.embed).toBe("INSERT INTO test (b, c) VALUES ('10', '20')");
 });
