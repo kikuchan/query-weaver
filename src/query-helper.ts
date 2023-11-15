@@ -194,7 +194,7 @@ export class QueryHelper<X extends object> {
 
   // Prisma adapter: NB; It only supports a query return rows
   public static get prisma() {
-    return async function <T extends QueryResultRow> (
+    return async function <T extends QueryResultRow>(
       this: object,
       { text, values }: QueryConfig
     ): Promise<QueryResult<T>> {
@@ -214,7 +214,7 @@ export class QueryHelper<X extends object> {
 
   // TypeORM adapter
   public static get typeorm() {
-    return async function <T extends QueryResultRow> (
+    return async function <T extends QueryResultRow>(
       this: object,
       { text, values }: QueryConfig
     ): Promise<QueryResult<T>> {

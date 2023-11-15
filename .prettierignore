@@ -1,0 +1,6 @@
+**/node_modules
+/dist
+/tests/package-lock.json
+.devcontainer
+.vscode
+pnpm-lock.yaml
