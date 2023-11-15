@@ -204,7 +204,7 @@ These APIs can be used, for example, to construct `IN` clause;
 
 ```js
 console.log(
-  sql`SELECT * FROM foobar WHERE foo IN (${sql(1, 2, 3).join()})`.embed
+  sql`SELECT * FROM foobar WHERE foo IN (${sql(1, 2, 3).join()})`.embed,
 );
 // SELECT * FROM foobar WHERE foo IN ('1', '2', '3')
 
@@ -232,7 +232,7 @@ console.log(sql`SELECT ${pgUtil.prepareValue([1, 2, 3, 4, 5])}`.embed);
 console.log(
   sql`SELECT ${[1, 2, 3, 4, 5]}`.toString({
     valueFn: (x) => pgEscape.literal(JSON.stringify(x)),
-  })
+  }),
 );
 // SELECT '[1,2,3,4,5]'
 ```

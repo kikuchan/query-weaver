@@ -169,10 +169,10 @@ type QueryFragmentsOptions = {
 
 export type QueryTemplateStyle = [
   text: TemplateStringsArray,
-  ...values: unknown[]
+  ...values: unknown[],
 ];
 export const isQueryTemplateStyle = (
-  args: unknown
+  args: unknown,
 ): args is QueryTemplateStyle => {
   if (!Array.isArray(args)) return false;
   if (typeof args?.[0] !== 'object' || args[0] === null || !('raw' in args[0]))
@@ -184,7 +184,7 @@ export const isQueryTemplateStyle = (
 
 function sewTemplateTextsAndValues<T = unknown, R = unknown>(
   texts: T[],
-  values: R[]
+  values: R[],
 ) {
   if (texts.length - 1 !== values.length)
     throw new Error('Invalid call of the function');
@@ -213,7 +213,7 @@ class QueryFragments extends QueryFragmentBase {
     if (Array.isArray(args[0])) {
       const [values, opts] = args as [
         values: (QueryFragment | undefined)[],
-        opts?: QueryFragmentsOptions
+        opts?: QueryFragmentsOptions,
       ];
       this.#opts = { ...this.#opts, ...opts };
       this.push(...values);
@@ -227,7 +227,7 @@ class QueryFragments extends QueryFragmentBase {
     prefix: string = '',
     glue: string = '',
     suffix: string = '',
-    empty: string = ''
+    empty: string = '',
   ) {
     this.#opts = { ...this.#opts, prefix, glue, suffix, empty };
     return this;
@@ -235,7 +235,7 @@ class QueryFragments extends QueryFragmentBase {
 
   push(...args: (QueryFragment | string | undefined)[]) {
     this.#list.push(
-      ...(args.map(makeRaw).filter((x) => x !== undefined) as QueryFragment[])
+      ...(args.map(makeRaw).filter((x) => x !== undefined) as QueryFragment[]),
     );
     return this;
   }
@@ -271,7 +271,7 @@ class QueryFragments extends QueryFragmentBase {
       this.#opts.prefix +
       this.#opts.wrapperFn(
         this.#list.map((x) => x.toString(opts)).join(this.#opts.glue),
-        opts
+        opts,
       ) +
       this.#opts.suffix
     );
@@ -288,12 +288,12 @@ export function sql(
     // sql`...` comes here
     const [texts, ...values] = args as [
       texts: TemplateStringsArray,
-      values: unknown[]
+      values: unknown[],
     ];
     // template string looks like a single QueryFragment for user
     fragments = [
       new QueryFragments(
-        sewTemplateTextsAndValues(texts.map(makeRaw), values.map(makeValue))
+        sewTemplateTextsAndValues(texts.map(makeRaw), values.map(makeValue)),
       ),
     ];
   } else {
@@ -324,15 +324,15 @@ export function json(
       new QueryFragments(
         sewTemplateTextsAndValues(
           texts.map(makeRaw),
-          values.map(makeJsonValue)
+          values.map(makeJsonValue),
         ),
-        { wrapperFn }
+        { wrapperFn },
       ),
     ];
   } else {
     // normal function call
     fragments = args.map(
-      (x) => new QueryFragments([makeJsonValue(x)], { wrapperFn })
+      (x) => new QueryFragments([makeJsonValue(x)], { wrapperFn }),
     );
   }
 
@@ -425,7 +425,7 @@ export function buildValues(fvs: (FieldValues | unknown[])[]) {
   }
 
   const values = sql(
-    ...array.map((v) => sql(...v).join(', '))
+    ...array.map((v) => sql(...v).join(', ')),
   ).setSewingPattern('(', '), (', ')');
   return sql`VALUES ${values}`;
 }
@@ -436,7 +436,7 @@ export function buildKeys(fvs: FieldValues[] | FieldValues) {
     throw new Error('Invalid call of the function');
 
   fvs = fvs.map((fv) =>
-    Object.fromEntries(Object.entries(fv).filter(([_, v]) => v !== undefined))
+    Object.fromEntries(Object.entries(fv).filter(([_, v]) => v !== undefined)),
   );
 
   const ks = Object.keys(fvs[0]);
@@ -451,7 +451,7 @@ export function buildKeys(fvs: FieldValues[] | FieldValues) {
 export function buildInsert(
   table: string,
   fvs: FieldValues[] | FieldValues,
-  appendix?: string | QueryFragment
+  appendix?: string | QueryFragment,
 ) {
   if (!Array.isArray(fvs)) fvs = [fvs];
 
@@ -467,7 +467,7 @@ export function buildUpdate(
   table: string,
   fv: FieldValues,
   where?: WhereArg,
-  appendix?: string | QueryFragment
+  appendix?: string | QueryFragment,
 ) {
   const pairs = new QueryFragments();
 
@@ -486,7 +486,7 @@ export function buildUpdate(
 export function buildDelete(
   table: string,
   where?: WhereArg,
-  appendix?: string | QueryFragment
+  appendix?: string | QueryFragment,
 ) {
   return sql`DELETE FROM ${makeIdent(table)} ${WHERE(where)}`
     .append(appendix)
