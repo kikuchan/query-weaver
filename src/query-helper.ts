@@ -17,7 +17,7 @@ export type QueryResultRow = pg.QueryResultRow;
 
 // pg (almost) compatible types to relief and reduce their requirements
 export type QueryResult<T extends QueryResultRow> = {
-  rowCount: number;
+  rowCount?: number | null;
   rows: T[];
   fields?: Partial<pg.FieldDef>[];
 };
@@ -25,6 +25,7 @@ export type QueryResult<T extends QueryResultRow> = {
 export type QueryConfig = {
   text: string;
   values: unknown[];
+  embed?: string;
 };
 
 export type QueryableFunction<T extends object> = (
@@ -36,11 +37,11 @@ export type Queryable<T extends object> = {
   query: QueryableFunction<T>;
 };
 
-type pgQueryResult<X, T extends QueryResultRow> = X extends {
+type pgQueryResult<X, T extends QueryResultRow> = (X extends {
   query(...args: unknown[]): Promise<pg.QueryResult<T>>; // pg
 }
   ? pg.QueryResult<T>
-  : QueryResult<T>;
+  : QueryResult<T>) & { rowCount: number };
 
 type QueryHelperOptions<X extends object> = {
   beforeQuery?: <T extends QueryConfig>(ctx: T) => void;
@@ -117,6 +118,10 @@ export class QueryHelper<X extends object> {
       this.#opts?.onError?.(query, e);
       throw e;
     });
+
+    if (typeof results.rowCount !== 'number') {
+      results.rowCount = results.rows?.length ?? 0;
+    }
 
     this.#opts?.afterQuery?.({
       ...query,
