@@ -191,7 +191,7 @@ function sewTemplateTextsAndValues<T = unknown, R = unknown>(
   return texts.flatMap((text, idx) => (idx ? [values[idx - 1], text] : [text]));
 }
 
-class QueryFragments extends QueryFragmentBase {
+export class QueryFragments extends QueryFragmentBase {
   #list: QueryFragment[] = [];
   #opts: Required<QueryFragmentsOptions>;
 
@@ -408,6 +408,14 @@ export function WHERE_OR(...fv: WhereArg[]) {
   return buildClauses(fv).setSewingPattern('WHERE ((', ') OR (', '))', '');
 }
 
+export function UNION_ALL(...fv: QueryFragments[]) {
+  return raw(...fv).join(' UNION ALL ');
+}
+
+export function UNION(...fv: QueryFragments[]) {
+  return raw(...fv).join(' UNION ');
+}
+
 export function buildValues(fvs: (FieldValues | unknown[])[]) {
   if (!Array.isArray(fvs)) {
     if (typeof fvs !== 'object')
@@ -520,6 +528,8 @@ sql.update = buildUpdate;
 sql.delete = buildDelete;
 sql.keys = buildKeys;
 sql.values = buildValues;
+sql.UNION_ALL = UNION_ALL;
+sql.UNION = UNION;
 
 export default {
   sql,
@@ -540,4 +550,6 @@ export default {
   buildUpdate,
   buildDelete,
   buildValues,
+  UNION_ALL,
+  UNION,
 };
