@@ -35,20 +35,20 @@
   "devDependencies": {
     "@types/pg": "^8.10.9",
     "@types/pg-escape": "^0.2.3",
-    "@typescript-eslint/eslint-plugin": "^6.11.0",
-    "@typescript-eslint/parser": "^6.11.0",
-    "esbuild": "^0.19.5",
-    "esbuild-node-externals": "^1.9.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "esbuild": "^0.19.11",
+    "esbuild-node-externals": "^1.12.0",
     "esbuild-register": "^3.5.0",
-    "eslint": "^8.53.0",
-    "eslint-config-prettier": "^9.0.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
     "husky": "^8.0.3",
-    "lint-staged": "^15.1.0",
+    "lint-staged": "^15.2.0",
     "pg": "^8.11.3",
-    "prettier": "^3.1.0",
+    "prettier": "^3.2.2",
     "rimraf": "^5.0.5",
-    "typescript": "^5.2.2",
-    "vitest": "^0.34.6"
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
   },
   "dependencies": {
     "pg-escape": "^0.2.0"
