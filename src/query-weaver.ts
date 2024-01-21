@@ -408,11 +408,11 @@ export function WHERE_OR(...fv: WhereArg[]) {
   return buildClauses(fv).setSewingPattern('WHERE ((', ') OR (', '))', '');
 }
 
-export function UNION_ALL(...fv: QueryFragments[]) {
+export function UNION_ALL(...fv: unknown[]) {
   return raw(...fv).join(' UNION ALL ');
 }
 
-export function UNION(...fv: QueryFragments[]) {
+export function UNION(...fv: unknown[]) {
   return raw(...fv).join(' UNION ');
 }
 
