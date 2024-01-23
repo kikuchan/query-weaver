@@ -416,6 +416,18 @@ export function UNION(...fv: unknown[]) {
   return raw(...fv).join(' UNION ');
 }
 
+export function LIMIT(limit: number | string | null | undefined) {
+  if (limit == null) return sql``;
+  limit = Number(limit);
+  return limit > 0 ? sql`LIMIT ${limit}` : sql``;
+}
+
+export function OFFSET(offset: number | string | null | undefined) {
+  if (offset == null) return sql``;
+  offset = Number(offset);
+  return offset >= 0 ? sql`OFFSET ${offset}` : sql``;
+}
+
 export function buildValues(fvs: (FieldValues | unknown[])[]) {
   if (!Array.isArray(fvs)) {
     if (typeof fvs !== 'object')
@@ -530,6 +542,8 @@ sql.keys = buildKeys;
 sql.values = buildValues;
 sql.UNION_ALL = UNION_ALL;
 sql.UNION = UNION;
+sql.LIMIT = LIMIT;
+sql.OFFSET = OFFSET;
 
 export default {
   sql,
@@ -552,4 +566,6 @@ export default {
   buildValues,
   UNION_ALL,
   UNION,
+  LIMIT,
+  OFFSET,
 };
