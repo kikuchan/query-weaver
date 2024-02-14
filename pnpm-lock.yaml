@@ -4,18 +4,10 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-dependencies:
-  pg-escape:
-    specifier: ^0.2.0
-    version: 0.2.0
-
 devDependencies:
   '@types/pg':
     specifier: ^8.11.0
     version: 8.11.0
-  '@types/pg-escape':
-    specifier: ^0.2.3
-    version: 0.2.3
   '@typescript-eslint/eslint-plugin':
     specifier: ^7.0.1
     version: 7.0.1(@typescript-eslint/parser@7.0.1)(eslint@8.56.0)(typescript@5.3.3)
@@ -708,10 +700,6 @@ packages:
     resolution: {integrity: sha512-nekiGu2NDb1BcVofVcEKMIwzlx4NjHlcjhoxxKBNLtz15Y1z7MYf549DFvkHSId02Ax6kGwWntIBPC3l/JZcmw==}
     dependencies:
       undici-types: 5.26.5
-    dev: true
-
-  /@types/pg-escape@0.2.3:
-    resolution: {integrity: sha512-pH5acHzd/Vg4dcHBBZDMUj92vsom8Cy5tCpZ4yfsM6C1bObUZTl8NbSI99gJpovpJ0l+r56q/v2OcdZLhKl2GA==}
     dev: true
 
   /@types/pg@8.11.0:
@@ -1952,10 +1940,6 @@ packages:
   /pg-connection-string@2.6.2:
     resolution: {integrity: sha512-ch6OwaeaPYcova4kKZ15sbJ2hKb/VP48ZD2gE7i1J+L4MspCtBMAx8nMgz7bksc7IojCIIWuEhHibSMFH8m8oA==}
     dev: true
-
-  /pg-escape@0.2.0:
-    resolution: {integrity: sha512-QfXcpxyN9vT+kvexQpTeNyiwCxs4LPXLAV/C0EeLTJPCF61swhGdDlnHcuDgxJudgKGfQYiCkegg0GsSKSvvEg==}
-    dev: false
 
   /pg-int8@1.0.1:
     resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}

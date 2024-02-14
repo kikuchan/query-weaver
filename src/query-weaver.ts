@@ -1,5 +1,3 @@
-import pgescape from 'pg-escape';
-
 type EscapeFunction = (v: unknown) => string;
 export type FieldValues = Record<string, unknown>;
 export type WhereArg =
@@ -9,11 +7,13 @@ export type WhereArg =
   | undefined
   | WhereArg[];
 
+import { quoteIdent, quoteLiteral } from './quote';
+
 export function pgIdent(s: string) {
   // '.' is a special for us
   return s
     .split('.')
-    .map((x) => pgescape.ident(x))
+    .map((x) => quoteIdent(x))
     .join('.');
 }
 
@@ -23,11 +23,12 @@ export function pgString(s: unknown): string {
   if (typeof s === 'boolean') return s ? 'true' : 'false';
   if (Array.isArray(s)) return 'ARRAY[' + s.map(pgString).join(',') + ']';
   if (typeof s === 'object') {
-    if ('toJSON' in s && typeof s.toJSON === 'function')
-      return pgescape.literal(s.toJSON());
-    return pgescape.literal(s.toString());
+    if ('toJSON' in s && typeof s.toJSON === 'function') {
+      return quoteLiteral(s.toJSON());
+    }
+    return quoteLiteral(s.toString());
   }
-  return pgescape.literal(String(s));
+  return quoteLiteral(String(s));
 }
 
 type QueryFragmentToStringOptions = {
