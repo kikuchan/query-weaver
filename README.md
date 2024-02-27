@@ -249,7 +249,7 @@ import zlib from 'node:zlib'
 const db = withQueryHelper(new pg.Pool(), {
   onError: (ctx, error) => console.error(JSON.stringify({ error: zlib.gzipSync(JSON.stringify({ ... ctx, error })).toString('base64') })),
   beforeQuery: (ctx) => console.log(JSON.stringify({ query: zlib.gzipSync(JSON.stringify(ctx)).toString('base64') })),
-  afterQuery: (ctx) => console.log(JSON.stringify({ query: zlib.gzipSync(JSON.stringify(ctx)).toString('base64') })),
+  afterQuery: (ctx) => console.log(JSON.stringify({ result: zlib.gzipSync(JSON.stringify(ctx)).toString('base64') })),
 });
 ```
 
