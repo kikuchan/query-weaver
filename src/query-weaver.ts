@@ -267,13 +267,14 @@ export class QueryFragments extends QueryFragmentBase {
   }
 
   toString(opts?: QueryFragmentToStringOptions): string {
-    if (this.#list.length === 0) return this.#opts.empty;
+    const children = this.#list
+      .map((x) => x.toString(opts))
+      .filter((x) => x)
+      .join(this.#opts.glue);
+    if (!children) return this.#opts.empty;
     return (
       this.#opts.prefix +
-      this.#opts.wrapperFn(
-        this.#list.map((x) => x.toString(opts)).join(this.#opts.glue),
-        opts,
-      ) +
+      this.#opts.wrapperFn(children, opts) +
       this.#opts.suffix
     );
   }
@@ -394,11 +395,11 @@ export function buildClauses(...args: WhereArg[]) {
 }
 
 export function OR(...fv: WhereArg[]) {
-  return buildClauses(fv).setSewingPattern('((', ') OR (', '))', 'false');
+  return buildClauses(fv).setSewingPattern('((', ') OR (', '))', '');
 }
 
 export function AND(...fv: WhereArg[]) {
-  return buildClauses(fv).setSewingPattern('((', ') AND (', '))', 'true');
+  return buildClauses(fv).setSewingPattern('((', ') AND (', '))', '');
 }
 
 export function WHERE(...fv: WhereArg[]) {
