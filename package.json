@@ -34,20 +34,20 @@
   "homepage": "https://github.com/kikuchan/query-weaver#readme",
   "license": "MIT",
   "devDependencies": {
-    "@types/pg": "^8.11.2",
-    "@typescript-eslint/eslint-plugin": "^7.2.0",
-    "@typescript-eslint/parser": "^7.2.0",
-    "esbuild": "^0.20.2",
-    "esbuild-node-externals": "^1.13.0",
+    "@types/pg": "^8.11.6",
+    "@typescript-eslint/eslint-plugin": "^7.15.0",
+    "@typescript-eslint/parser": "^7.15.0",
+    "esbuild": "^0.23.0",
+    "esbuild-node-externals": "^1.13.1",
     "esbuild-register": "^3.5.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "husky": "^9.0.11",
-    "lint-staged": "^15.2.2",
-    "pg": "^8.11.3",
-    "prettier": "^3.2.5",
-    "rimraf": "^5.0.5",
-    "typescript": "^5.4.2",
-    "vitest": "^1.4.0"
+    "lint-staged": "^15.2.7",
+    "pg": "^8.12.0",
+    "prettier": "^3.3.2",
+    "rimraf": "^5.0.8",
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
   }
 }
