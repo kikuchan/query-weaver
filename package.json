@@ -1,6 +1,6 @@
 {
   "name": "query-weaver",
-  "version": "0.2.0-alpha.0",
+  "version": "0.2.0-alpha.1",
   "description": "SQL query builder using template string literal",
   "main": "./dist/index.cjs.js",
   "module": "./dist/index.esm.mjs",
