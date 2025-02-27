@@ -1,4 +1,11 @@
-type EscapeFunction = (v: unknown) => string;
+import { quoteIdent, quoteLiteral } from './quote';
+import { StringReader } from './string-reader';
+
+type Context = {
+  inLineComment?: boolean;
+  inBlockComment?: boolean;
+};
+type EscapeFunction = (v: unknown, context?: Context) => string;
 export type FieldValues = Record<string, unknown>;
 export type WhereArg =
   | string
@@ -7,9 +14,7 @@ export type WhereArg =
   | undefined
   | WhereArg[];
 
-import { quoteIdent, quoteLiteral } from './quote';
-
-export function pgIdent(s: string) {
+export function pgIdent(s: string, _ctx?: Context) {
   // '.' is a special for us
   return s
     .split('.')
@@ -18,10 +23,11 @@ export function pgIdent(s: string) {
 }
 
 // fallback function for when the EscapeFunction is not specified
-export function pgString(s: unknown): string {
+export function pgString(s: unknown, _ctx?: Context): string {
   if (s === null) return 'NULL';
   if (typeof s === 'boolean') return s ? 'true' : 'false';
-  if (Array.isArray(s)) return 'ARRAY[' + s.map(pgString).join(',') + ']';
+  if (Array.isArray(s))
+    return 'ARRAY[' + s.map((e) => pgString(e)).join(',') + ']';
   if (typeof s === 'object') {
     if ('toJSON' in s && typeof s.toJSON === 'function') {
       return quoteLiteral(s.toJSON());
@@ -34,6 +40,7 @@ export function pgString(s: unknown): string {
 type QueryFragmentToStringOptions = {
   valueFn?: EscapeFunction;
   identFn?: EscapeFunction;
+  context: Context;
 };
 
 export interface QueryFragment {
@@ -54,12 +61,20 @@ abstract class QueryFragmentBase implements QueryFragment {
   get compiled() {
     const values = [] as unknown[];
     const text = this.toString({
-      valueFn: (x: unknown) => {
+      valueFn: (x: unknown, context) => {
+        if (context?.inBlockComment || context?.inLineComment) return '';
         values.push(x);
         return '$' + values.length;
       },
+      context: {},
     });
-    const embed = this.toString();
+    const embed = this.toString({
+      valueFn: (x: unknown, context) => {
+        if (context?.inBlockComment || context?.inLineComment) return '';
+        return pgString(x);
+      },
+      context: {},
+    });
 
     return {
       text,
@@ -103,7 +118,7 @@ class QueryFragmentValue extends QueryFragmentBase {
   }
 
   toString(opts?: QueryFragmentToStringOptions) {
-    return (opts?.valueFn ?? pgString)(this.#value);
+    return (opts?.valueFn ?? pgString)(this.#value, opts?.context);
   }
 }
 
@@ -116,7 +131,7 @@ class QueryFragmentIdent extends QueryFragmentBase {
   }
 
   toString(opts?: QueryFragmentToStringOptions) {
-    return (opts?.identFn ?? pgIdent)(this.#ident);
+    return (opts?.identFn ?? pgIdent)(this.#ident, opts?.context);
   }
 }
 
@@ -130,7 +145,31 @@ class QueryFragmentRawString extends QueryFragmentBase {
   }
 
   /* toString(_?: QueryFragmentToStringOptions) { */
-  toString() {
+  toString(opts?: QueryFragmentToStringOptions) {
+    if (opts?.context) {
+      const r = new StringReader(this.#string);
+      while (!r.eof()) {
+        if (opts.context.inBlockComment) {
+          if (!r.skipUntil('*/')) break;
+
+          r.skip(2);
+          opts.context.inBlockComment = false;
+        } else if (opts.context.inLineComment) {
+          if (!r.skipUntil('\n')) break;
+
+          r.skip(1);
+          opts.context.inLineComment = false;
+        } else {
+          if (!r.skipUntil(/--|\/\*/)) break;
+
+          if (r.read(2) === '--') {
+            opts.context.inLineComment = true;
+          } else {
+            opts.context.inBlockComment = true;
+          }
+        }
+      }
+    }
     return this.#string;
   }
 }
@@ -319,7 +358,7 @@ export function json(
 ) {
   let fragments: (QueryFragment | undefined)[];
   const wrapperFn = (x: string, opts?: QueryFragmentToStringOptions) =>
-    (opts?.valueFn || pgString)(x);
+    (opts?.valueFn || pgString)(x, opts?.context);
   if (isQueryTemplateStyle(args)) {
     const [texts, ...values] = args;
     fragments = [
