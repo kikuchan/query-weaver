@@ -3,7 +3,7 @@ import { StringReader } from './string-reader';
 
 type Context = {
   inLineComment?: boolean;
-  inBlockComment?: boolean;
+  inBlockComment?: number;
   inSingleQuote?: boolean;
   inEscapedSingleQuote?: boolean;
   dollarQuoted?: string;
@@ -69,10 +69,11 @@ function pgContextHandler(ctx: Context, src: string): void {
       r.skip();
       ctx.inSingleQuote = false;
     } else if (ctx.inBlockComment) {
-      if (!r.skipUntil('*/')) break;
+      if (!r.skipUntil(/\/\*|\*\//)) break;
+      if (r.match('/*', () => ctx!.inBlockComment!++)) continue;
 
       r.skip(2);
-      ctx.inBlockComment = false;
+      ctx.inBlockComment--;
     } else if (ctx.inLineComment) {
       if (!r.skipUntil('\n')) break;
 
@@ -85,7 +86,7 @@ function pgContextHandler(ctx: Context, src: string): void {
       if (r.match("E'", () => (ctx.inEscapedSingleQuote = true))) continue;
       if (r.match("'", () => (ctx.inSingleQuote = true))) continue;
       if (r.match('--', () => (ctx.inLineComment = true))) continue;
-      if (r.match('/*', () => (ctx.inBlockComment = true))) continue;
+      if (r.match('/*', () => (ctx.inBlockComment = 1))) continue;
 
       r.skip();
     }
