@@ -83,7 +83,7 @@ function pick<T extends { [X in string]: T[X] }, K extends string>(
 export class QueryHelper<X extends object = object> {
   #db: X;
   #opts: QueryHelperOptions & Partial<Queryable<X>>;
-  #inTransaction: boolean = false;
+  #inTransaction: number = 0;
 
   constructor(db: X, opts: QueryHelperOptions & Partial<Queryable<X>> = {}) {
     this.#db = db;
@@ -275,23 +275,23 @@ export class QueryHelper<X extends object = object> {
    *   });
    */
   async begin<R>(callback: (conn: this) => Promise<R>) {
-    if (this.#inTransaction)
-      throw new Error('Nested transaction is not supported');
-
     try {
-      this.#inTransaction = true;
-      await this.#exec({ text: 'BEGIN', values: [] });
+      if (!this.#inTransaction++) {
+        await this.#exec({ text: 'BEGIN', values: [] });
+      }
 
       const result = await callback(this);
 
-      await this.#exec({ text: 'COMMIT', values: [] });
+      if (!--this.#inTransaction) {
+        await this.#exec({ text: 'COMMIT', values: [] });
+      }
 
       return result;
     } catch (e) {
-      await this.#exec({ text: 'ROLLBACK', values: [] });
+      if (!--this.#inTransaction) {
+        await this.#exec({ text: 'ROLLBACK', values: [] });
+      }
       throw e;
-    } finally {
-      this.#inTransaction = false;
     }
   }
 

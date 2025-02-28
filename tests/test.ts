@@ -1,13 +1,20 @@
 import { sql, withQueryHelper, json, WHERE, OR, buildInsert } from '../src';
-import { expect, test } from 'vitest';
+import { beforeEach, expect, test } from 'vitest';
 
 const queryable = {
+  executed: [] as { text: string; values?: unknown[] }[],
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async query(cfg: { text: string; values?: unknown[] }): Promise<any> {
+    queryable.executed.push(cfg);
     return { rows: [{ text: cfg.text, values: cfg.values }], rowCount: 1 };
   },
 };
 const db = withQueryHelper(queryable); // mock
+
+beforeEach(() => {
+  queryable.executed = [];
+});
 
 test('simple', async () => {
   const foo = 1,
@@ -94,7 +101,7 @@ test('undefined', async () => {
 });
 
 test('comments', async () => {
-  const v = "test";
+  const v = 'test';
   const q = sql`SELECT * FROM (
     VALUES ('a')
          , (${v})
@@ -128,4 +135,46 @@ test('comments', async () => {
          , (E'''/*\\''), ($3)
          , ($4)
   ) tmp`);
+});
+
+test('nested-transactions', async () => {
+  await db.begin(async () => {
+    await db.query('DUMMY1');
+    await db.begin(async () => {
+      await db.query('DUMMY2');
+    });
+    await db.query('DUMMY3');
+
+    return true;
+  });
+
+  expect(db.executed).toStrictEqual([
+    { text: 'BEGIN', values: [] },
+    { text: 'DUMMY1', values: [] },
+    { text: 'DUMMY2', values: [] },
+    { text: 'DUMMY3', values: [] },
+    { text: 'COMMIT', values: [] },
+  ]);
+});
+
+test('nested-transactions-rollback', async () => {
+  await expect(
+    db.begin(async () => {
+      await db.query('DUMMY1');
+      await db.begin(async () => {
+        await db.query('DUMMY2');
+        throw new Error('ERROR');
+      });
+      await db.query('DUMMY3');
+
+      return true;
+    }),
+  ).rejects.toThrowError();
+
+  expect(db.executed).toStrictEqual([
+    { text: 'BEGIN', values: [] },
+    { text: 'DUMMY1', values: [] },
+    { text: 'DUMMY2', values: [] },
+    { text: 'ROLLBACK', values: [] },
+  ]);
 });
