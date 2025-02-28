@@ -4,7 +4,11 @@ import { StringReader } from './string-reader';
 type Context = {
   inLineComment?: boolean;
   inBlockComment?: boolean;
+  inSingleQuote?: boolean;
+  inEscapedSingleQuote?: boolean;
+  dollarQuoted?: string;
 };
+
 type EscapeFunction = (v: unknown, context?: Context) => string;
 export type FieldValues = Record<string, unknown>;
 export type WhereArg =
@@ -37,10 +41,74 @@ export function pgString(s: unknown, _ctx?: Context): string {
   return quoteLiteral(String(s));
 }
 
+function pgContextHandler(ctx: Context, src: string): void {
+  const r = new StringReader(src);
+
+  while (!r.eof()) {
+    if (ctx.dollarQuoted) {
+      if (!r.skipUntil(ctx.dollarQuoted)) break;
+
+      r.skip(ctx.dollarQuoted.length);
+      ctx.dollarQuoted = undefined;
+    } else if (ctx.inEscapedSingleQuote) {
+      if (!r.skipUntil(/[\\']/)) break;
+      if (r.match("''")) continue; // ignore double single-quote
+      if (r.match('\\')) {
+        r.skip(); // just skip the escaped letter
+        continue;
+      }
+
+      // must be the ending single-quote
+      r.skip();
+      ctx.inEscapedSingleQuote = false;
+    } else if (ctx.inSingleQuote) {
+      if (!r.skipUntil("'")) break;
+      if (r.match("''")) continue; // ignore double single-quote
+
+      // must be the ending single-quote
+      r.skip();
+      ctx.inSingleQuote = false;
+    } else if (ctx.inBlockComment) {
+      if (!r.skipUntil('*/')) break;
+
+      r.skip(2);
+      ctx.inBlockComment = false;
+    } else if (ctx.inLineComment) {
+      if (!r.skipUntil('\n')) break;
+
+      r.skip();
+      ctx.inLineComment = false;
+    } else {
+      if (!r.skipUntil(/[-$E'/]/)) break;
+
+      if (r.match(/\$[a-zA-Z]*\$/, (m) => (ctx.dollarQuoted = m[0]))) continue;
+      if (r.match("E'", () => (ctx.inEscapedSingleQuote = true))) continue;
+      if (r.match("'", () => (ctx.inSingleQuote = true))) continue;
+      if (r.match('--', () => (ctx.inLineComment = true))) continue;
+      if (r.match('/*', () => (ctx.inBlockComment = true))) continue;
+
+      r.skip();
+    }
+  }
+}
+
+function shouldIgnoreValue(ctx?: Context) {
+  if (!ctx) return false;
+
+  return !!(
+    ctx.dollarQuoted ||
+    ctx.inLineComment ||
+    ctx.inBlockComment ||
+    ctx.inSingleQuote ||
+    ctx.inEscapedSingleQuote
+  );
+}
+
 type QueryFragmentToStringOptions = {
   valueFn?: EscapeFunction;
   identFn?: EscapeFunction;
   context: Context;
+  contextHandler?: (ctx: Context, s: string) => void;
 };
 
 export interface QueryFragment {
@@ -62,18 +130,20 @@ abstract class QueryFragmentBase implements QueryFragment {
     const values = [] as unknown[];
     const text = this.toString({
       valueFn: (x: unknown, context) => {
-        if (context?.inBlockComment || context?.inLineComment) return '';
+        if (shouldIgnoreValue(context)) return '';
         values.push(x);
         return '$' + values.length;
       },
       context: {},
+      contextHandler: pgContextHandler,
     });
     const embed = this.toString({
       valueFn: (x: unknown, context) => {
-        if (context?.inBlockComment || context?.inLineComment) return '';
+        if (shouldIgnoreValue(context)) return '';
         return pgString(x);
       },
       context: {},
+      contextHandler: pgContextHandler,
     });
 
     return {
@@ -146,29 +216,8 @@ class QueryFragmentRawString extends QueryFragmentBase {
 
   /* toString(_?: QueryFragmentToStringOptions) { */
   toString(opts?: QueryFragmentToStringOptions) {
-    if (opts?.context) {
-      const r = new StringReader(this.#string);
-      while (!r.eof()) {
-        if (opts.context.inBlockComment) {
-          if (!r.skipUntil('*/')) break;
-
-          r.skip(2);
-          opts.context.inBlockComment = false;
-        } else if (opts.context.inLineComment) {
-          if (!r.skipUntil('\n')) break;
-
-          r.skip(1);
-          opts.context.inLineComment = false;
-        } else {
-          if (!r.skipUntil(/--|\/\*/)) break;
-
-          if (r.read(2) === '--') {
-            opts.context.inLineComment = true;
-          } else {
-            opts.context.inBlockComment = true;
-          }
-        }
-      }
+    if (opts?.context && opts?.contextHandler) {
+      opts.contextHandler(opts.context, this.#string);
     }
     return this.#string;
   }
