@@ -147,6 +147,12 @@ export class QueryHelper<X extends object = object> {
   // ======================================================================
   // query executors
 
+  /**
+   * INSERT builder
+   *
+   * @example
+   *   await db.insert('table', { name: 'myname' }, 'RETURNING *');
+   */
   async insert<T extends QueryResultRow>(
     table: string,
     fv: FieldValues,
@@ -156,6 +162,12 @@ export class QueryHelper<X extends object = object> {
     return await this.#query<T>([query]);
   }
 
+  /**
+   * UPDATE builder
+   *
+   * @example
+   *   await db.update('table', { name: 'myname' }, { id: 'root' }, 'RETURNING *');
+   */
   async update<T extends QueryResultRow>(
     table: string,
     fv: FieldValues,
@@ -166,6 +178,12 @@ export class QueryHelper<X extends object = object> {
     return await this.#query<T>([query]);
   }
 
+  /**
+   * DELETE builder
+   *
+   * @example
+   *   await db.delete('table', { id: 'root' }, 'RETURNING *');
+   */
   async delete<T extends QueryResultRow>(
     table: string,
     where: WhereArg,
@@ -175,33 +193,87 @@ export class QueryHelper<X extends object = object> {
     return await this.#query<T>([query]);
   }
 
+  /**
+   * Execute query with query-weaver
+   *
+   * It's equivalent to ```db.query(sql`...`)```
+   *
+   * @example
+   *   const { rows } = await db.query`SELECT * FROM table WHERE id = ${id}`
+   */
   async query<T extends QueryResultRow>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query<T>(args);
   }
 
+  /**
+   * Get rows directly
+   *
+   * @example
+   *   const rows = await db.getRows`SELECT * FROM table WHERE id = ${id}`
+   *     => [{ id: 10, name: '...' }, ...]
+   */
   async getRows<T extends QueryResultRow>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query<T>(args).then((x) => x.rows);
   }
 
+  /**
+   * Get a single row directly
+   *
+   * @example
+   *   const row = await db.getRow`SELECT * FROM table WHERE id = ${id}`
+   *     => { id: 10, name: '...' }
+   */
   async getRow<T extends QueryResultRow>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query<T>(args).then((x) => x.rows?.[0] as T | undefined);
   }
 
+  /**
+   * Get a single value directly
+   *
+   * @example
+   *   const value = await db.getRow`SELECT 10`
+   *     => 10
+   */
   async getOne<T = unknown>(...args: QueryTemplateOrSimpleQuery) {
     return this.#query<[T]>(args).then(
       (x) => Object.values(x.rows?.[0] ?? {})?.[0] as T | undefined,
     );
   }
 
+  /**
+   * Get rowCount directly
+   *
+   * @example
+   *   const numRows = await db.getCount`SELECT * FROM table`
+   *     => 10
+   */
   async getCount(...args: QueryTemplateOrSimpleQuery) {
     return this.#query(args).then((x) => x.rowCount);
   }
 
+  /**
+   * Execute a single statement
+   * (It's equivalent to getCount)
+   *
+   * @example
+   *   const result = await db.exec`INSERT INTO ...`
+   *     => 1
+   */
   async exec(...args: QueryTemplateOrSimpleQuery) {
     // same as getCount
     return this.#query(args).then((x) => x.rowCount);
   }
 
+  /**
+   * BEGIN the transaction
+   *
+   * @example
+   *   await db.begin(() => {
+   *     await db.insert(...);
+   *     await db.update(...);
+   *     return true;
+   *   });
+   */
   async begin<R>(callback: (conn: this) => Promise<R>) {
     if (this.#inTransaction)
       throw new Error('Nested transaction is not supported');
@@ -226,7 +298,9 @@ export class QueryHelper<X extends object = object> {
   // ======================================================================
   // query adapters
 
-  // Prisma adapter: NB; It only supports a query return rows
+  /**
+   * Prisma adapter: NB; It only supports a query that returns rows
+   */
   public static get prisma() {
     return async function <T extends QueryResultRow>(
       this: object,
@@ -246,7 +320,9 @@ export class QueryHelper<X extends object = object> {
     };
   }
 
-  // TypeORM adapter
+  /**
+   * TypeORM adapter
+   */
   public static get typeorm() {
     return async function <T extends QueryResultRow>(
       this: object,
@@ -292,6 +368,9 @@ export type WithQueryHelper<T extends object = object> = Override<
 /**
  * Returns a proxy object that overrides the queryable instance `db` by Query Helper utilities
  * @param db - Queryable object to be wrapped
+ *
+ * @example
+ *   const db = withQueryHelper(new pg.Client());
  */
 export function withQueryHelper<T extends Queryable<object>>(
   db: T,

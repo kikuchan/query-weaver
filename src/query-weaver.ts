@@ -374,6 +374,9 @@ export class QueryFragments extends QueryFragmentBase {
   }
 }
 
+/**
+ * SQL template tag
+ */
 export function sql(
   ...args:
     | [texts: TemplateStringsArray, ...values: unknown[]]
@@ -400,12 +403,31 @@ export function sql(
   return new QueryFragments(fragments);
 }
 
+/**
+ * Example:
+ *   SELECT * FROM ${ident('test.table')}
+ *     => SELECT * FROM "test"."table"
+ */
 export const ident = makeIdent;
 
+/**
+ * Raw string injection
+ */
 export function raw(...args: unknown[]) {
   return new QueryFragments(args.map(makeRaw));
 }
 
+/**
+ * JSON injector
+ *
+ * Example 1:
+ *   json({ obj: 'abc' )
+ *     => '{"obj": "abc"}'
+ *
+ * Example 2:
+ *   json｀{"obj": ${ 'abc' }}｀
+ *     => '{"obj": "abc"}'
+ */
 export function json(
   ...args:
     | [...json: unknown[]]
