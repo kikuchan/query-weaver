@@ -92,3 +92,40 @@ test('undefined', async () => {
   expect(q.text).toBe('INSERT INTO test (b, c) VALUES ($1, $2)');
   expect(q.embed).toBe("INSERT INTO test (b, c) VALUES ('10', '20')");
 });
+
+test('comments', async () => {
+  const v = "test";
+  const q = sql`SELECT * FROM (
+    VALUES ('a')
+         , (${v})
+         /* /*
+          *
+          * -- nesting */
+         , ${v}
+          *
+          */
+         , ($hoge$ $fuge$ $moge$ ${v} ' $hoge$)
+         -- , (${v})
+         , ('-- ${v} \\'), (${v})
+         /* , (${v}) */
+         , (E'''/*\\''), (${v})
+         , (${v})
+  ) tmp`;
+
+  expect(q.text).toBe(`SELECT * FROM (
+    VALUES ('a')
+         , ($1)
+         /* /*
+          *
+          * -- nesting */
+         , 
+          *
+          */
+         , ($hoge$ $fuge$ $moge$  ' $hoge$)
+         -- , ()
+         , ('--  \\'), ($2)
+         /* , () */
+         , (E'''/*\\''), ($3)
+         , ($4)
+  ) tmp`);
+});
