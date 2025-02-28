@@ -122,56 +122,61 @@ export interface QueryFragment {
 }
 
 abstract class QueryFragmentBase implements QueryFragment {
-  // XXX: entries for defineProperties
   text: string = '';
   values: unknown[] = [];
-  embed?: string = '';
+  sql: string = '';
+  statement: string = '';
+  embed: string = '';
 
-  get compiled() {
-    const values = [] as unknown[];
-    const text = this.toString({
-      valueFn: (x: unknown, context) => {
+  #compile(valueFn: (x: unknown) => string) {
+    return this.toString({
+      valueFn: (x, context) => {
         if (shouldIgnoreValue(context)) return '';
-        values.push(x);
-        return '$' + values.length;
+        return valueFn(x);
       },
       context: {},
       contextHandler: pgContextHandler,
     });
-    const embed = this.toString({
-      valueFn: (x: unknown, context) => {
-        if (shouldIgnoreValue(context)) return '';
-        return pgString(x);
-      },
-      context: {},
-      contextHandler: pgContextHandler,
-    });
-
-    return {
-      text,
-      values,
-      embed,
-    };
   }
 
   constructor() {
     Object.defineProperties(this, {
       text: {
         enumerable: true,
-        get() {
-          return this.compiled.text;
+        get: () => {
+          let idx = 1;
+          return this.#compile(() => '$' + idx++);
         },
       },
+
       values: {
         enumerable: true,
-        get() {
-          return this.compiled.values;
+        get: () => {
+          const values: unknown[] = [];
+          this.#compile((x) => (values.push(x), ''));
+          return values;
         },
       },
+
+      sql: {
+        enumerable: true,
+        get: () => {
+          return this.#compile(() => '?');
+        },
+      },
+
+      statement: {
+        enumerable: true,
+        get: () => {
+          let idx = 1;
+          return this.#compile(() => ':' + idx++);
+        },
+      },
+
       embed: {
         enumerable: true,
-        get() {
-          return this.compiled.embed;
+        get: () => {
+          return this.#compile((x) => pgString(x));
         },
       },
     });
