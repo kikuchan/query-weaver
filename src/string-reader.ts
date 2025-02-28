@@ -36,15 +36,16 @@ export class StringReader {
   }
 
   read(n?: number) {
-    if (this.eof()) return undefined;
+    if (this.eof()) return '';
 
-    const result = this.#s.slice(this.#pos, this.#pos + (n ?? 1));
-    this.skip(n ?? 1);
+    n = n ?? 1;
+    const result = this.#s.slice(this.#pos, this.#pos + n);
+    this.skip(n);
     return result;
   }
 
-  skip(n: number) {
-    this.#pos += Math.min(n, this.#length - this.#pos);
+  skip(n?: number) {
+    this.#pos += Math.min(n ?? 1, this.#length - this.#pos);
   }
 
   eof() {
