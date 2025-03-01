@@ -54,7 +54,7 @@ type pgQueryResult<X, T extends QueryResultRow> = (X extends {
   ? pg.QueryResult<T>
   : QueryResult<T>) & { rowCount: number };
 
-type QueryHelperOptions = {
+export type QueryHelperOptions = {
   beforeQuery?: <T extends QueryConfig>(ctx: T) => void;
   afterQuery?: <T extends QueryConfig, R extends QueryResultRow>(
     ctx: T,
