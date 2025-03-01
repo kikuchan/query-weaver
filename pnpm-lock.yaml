@@ -8,6 +8,9 @@ devDependencies:
   '@biomejs/biome':
     specifier: ^1.9.4
     version: 1.9.4
+  '@kikuchan/string-reader':
+    specifier: 0.1.0-alpha.1
+    version: 0.1.0-alpha.1
   '@types/pg':
     specifier: ^8.11.11
     version: 8.11.11
@@ -33,8 +36,8 @@ devDependencies:
     specifier: ^6.0.1
     version: 6.0.1
   typescript:
-    specifier: ^5.7.3
-    version: 5.7.3
+    specifier: ^5.8.2
+    version: 5.8.2
   vitest:
     specifier: ^3.0.7
     version: 3.0.7
@@ -368,6 +371,10 @@ packages:
 
   /@jridgewell/sourcemap-codec@1.5.0:
     resolution: {integrity: sha512-gv3ZRaISU3fjPAgNsriBRqGWQL6quFx04YMPW/zD8XMLsU32mhCCbfbO6KZFLjvYpCZ8zyDEgqsgf+PwPaM7GQ==}
+    dev: true
+
+  /@kikuchan/string-reader@0.1.0-alpha.1:
+    resolution: {integrity: sha512-dUv/UO5D2AXkjXI3Vc4xud3ON7DlXt5JvZL/73PH4pE5+6ycqFIz5AN1Ddl9edH5y+oxVQCAtGJrlS0Gqva94Q==}
     dev: true
 
   /@rollup/rollup-android-arm-eabi@4.34.8:
@@ -1477,8 +1484,8 @@ packages:
       is-number: 7.0.0
     dev: true
 
-  /typescript@5.7.3:
-    resolution: {integrity: sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw==}
+  /typescript@5.8.2:
+    resolution: {integrity: sha512-aJn6wq13/afZp/jT9QZmwEjDqqvSGp1VT5GVg+f/t6/oVyrgXM6BY1h9BRh/O5p3PlUPAe+WuiEZOmb/49RqoQ==}
     engines: {node: '>=14.17'}
     hasBin: true
     dev: true

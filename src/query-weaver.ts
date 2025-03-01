@@ -1,5 +1,5 @@
 import { quoteIdent, quoteLiteral } from './quote';
-import { StringReader } from './string-reader';
+import { StringReader } from '@kikuchan/string-reader';
 
 type Context = {
   inLineComment?: boolean;
