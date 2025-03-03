@@ -1,6 +1,6 @@
 # Query Weaver
 
-Compose SQL statements safely by leveraging template string literals
+Compose SQL statements safely by leveraging template string literals.
 
 ## Install
 
@@ -8,26 +8,18 @@ Compose SQL statements safely by leveraging template string literals
 $ npm install query-weaver
 ```
 
-## Usage
+## Basic Usage
 
-### As a SQL Builder
+### As an SQL Builder
 
 <!-- prettier-ignore -->
-```js
+```ts
 import { sql } from 'query-weaver';
-import pg from 'pg';
 
 const foo = 1, bar = 'Bar';
 const query = sql`SELECT * FROM foobar WHERE foo = ${foo} AND bar = ${bar}`;
-
-console.log(query.toString());
-// SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'
-
-const db = new pg.Pool();
-const { rows } = await db.query(query);
-
-console.log(rows);
-// [ { foo: 1, bar: 'Bar' } ]
+console.log(query);
+// QueryFragments { text: [Getter], values: [Getter], embed: [Getter] }
 
 console.log(JSON.stringify(query, null, 2));
 // {
@@ -38,17 +30,14 @@ console.log(JSON.stringify(query, null, 2));
 //   ],
 //   "embed": "SELECT * FROM foobar WHERE foo = '1' AND bar = 'Bar'"
 // }
-
-db.end();
 ```
 
-As you can see, the query is executed using **placeholder** on the database. This makes string-value concatenation safe.
-You can also get a string embed version of the query, so that you can debug the query easily.
+The query is executed using **placeholders** in the database, which makes string-value concatenation safe. You can also obtain an embedded string version of the query so that you can easily debug it by copying and pasting.
 
-### As a Query Helper (with `node-postgres` for example)
+### Inject a Query Helper
 
 <!-- prettier-ignore -->
-```js
+```ts
 import { withQueryHelper } from 'query-weaver';
 import pg from 'pg';
 
@@ -61,23 +50,23 @@ const { rows } =
 console.log(rows);
 // [ { foo: 1, bar: 'Bar' } ]
 
-db.end(); // this call will be proxied to the original pg.Pool() instance
+db.end();
 ```
 
-Almost the same as above, but you can directly pass the template string to the `query` function.
+The `withQueryHelper` utility wraps the original object with a Query Helper, providing utility functions as if they were built into the original object. Essentially, these are shorthand functions that bridge the original `query` and the Query Weaver functions, with the most notable features being debugging and transaction support.
 
-### WHERE builder
+## Utilities
+
+### WHERE Builder
 
 `WHERE_AND` / `WHERE_OR` / `AND` / `OR` / `WHERE` (`WHERE_AND` alias)
 
 <!-- prettier-ignore -->
-```js
+```ts
 import { sql, WHERE, OR } from 'query-weaver';
 
 const a = 1, b = 'string', c = null, d = 5, e = false, f = [1, 2, 3, 4, 5];
-console.log(
-  String(sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`)
-);
+console.log(String(sql`SELECT * FROM foobar ${WHERE({ a, b, c }, OR({ d, e }))}`));
 // SELECT * FROM foobar WHERE ((a = '1') AND (b = 'string') AND (c IS NULL) AND (((d = '5') OR (e = false))))
 
 const q = sql`SELECT * FROM foobar ${WHERE(
@@ -97,7 +86,9 @@ console.log(q.embed);
 // SELECT * FROM foobar WHERE ((a = '10') AND (b = 'string') AND (c IS UNKNOWN) AND (d BETWEEN '1' AND '5') AND (e IS NULL) AND (f = ANY (ARRAY['1','2','3','4','5'])))
 ```
 
-### JSON builder
+### JSON Builder
+
+`json`
 
 ```js
 import pg from 'pg';
@@ -109,7 +100,7 @@ const id = 10;
 const obj = { b: 'string', c: [1, 2, 'X'], d: { e: null, f: undefined } };
 
 const row =
-  await db.getRow`SELECT * FROM jsonb_to_record(${json`{ 'a': ${obj}, 'b': ${id} }`}) AS (a jsonb, b int);`;
+  await db.getRow`SELECT * FROM jsonb_to_record(${json`{"a": ${obj}, "b": ${id}}`}) AS (a jsonb, b int);`;
 
 console.log(row);
 // {
@@ -120,92 +111,108 @@ console.log(row);
 db.end();
 ```
 
-### VALUES builder
+### VALUES Builder
 
 `buildValues` / `sql.values`
 
 ```js
-sql.values([[1, 2, 3], ...]);              // => VALUES (1, 2, 3), (...), ...
-sql.values([{ a: 1, b: 2, c: 3 }], ...]);  // => VALUES (1, 2, 3), (...), ...
+sql.values([[1, 2, 3], ...]);            // => VALUES (1, 2, 3), (...), ...
+sql.values([{ a: 1, b: 2, c: 3 }, ...]); // => VALUES (1, 2, 3), (...), ...
 ```
 
-### Key builder
+### Key Builder
 
 `buildKeys` / `sql.keys`
 
 ```js
-sql.keys({ a: 1, b: 2, c: 3 });         // => (a, b, c)
-sql.keys([{ a: 1, b: 2, c: 3 }, ...]);  // => (a, b, c)
+sql.keys({ a: 1, b: 2, c: 3 });        // => (a, b, c)
+sql.keys([{ a: 1, b: 2, c: 3 }, ...]); // => (a, b, c)
 ```
 
-### Raw builder
+### Raw Builder
 
 `raw`
 
-```js
-console.log(sql`SELECT * FROM foobar WHERE ${raw("bar LIKE '%something%'")}`);
+```ts
+import { sql, raw } from 'query-weaver';
+
+console.log(JSON.stringify(sql`SELECT * FROM foobar WHERE ${raw("bar LIKE '%something%'")}`));
+// {"text":"SELECT * FROM foobar WHERE bar LIKE '%something%'","values":[],"embed":"SELECT * FROM foobar WHERE bar LIKE '%something%'"}
 ```
 
-### Simple INSERT builder and executor
+### INSERT Builder and Helper
 
-`buildInsert` / `sql.insert` builder, and `insert` executor
+`buildInsert` / `sql.insert` builder, and `insert` helper
 
 ```js
-sql.insert(tableName, { ... fieldValuePairs });  // => sql`INSERT INTO ...`
-db.insert(tableName, { ... fieldValuePairs });   // => db.query`INSERT INTO ...`
+sql.insert(tableName, { ...fieldValuePairs }); // => sql`INSERT INTO ...`
+db.insert(tableName, { ...fieldValuePairs });  // => db.query`INSERT INTO ...`
 
-// bulk insert
-sql.insert(tableName, [{ ... fieldValuePairs }, ... ]);  // => sql`INSERT INTO ... VALUES (...), (...), ...`
-db.insert(tableName, [{ ... fieldValuePairs }, ... ]);   // => db.query`INSERT INTO ... VALUES (...), (...), ...`
+// Bulk insert
+sql.insert(tableName, [{ ...fieldValuePairs }, ...]); // => sql`INSERT INTO ... VALUES (...), (...), ...`
+db.insert(tableName, [{ ...fieldValuePairs }, ...]);  // => db.query`INSERT INTO ... VALUES (...), (...), ...`
 ```
 
-### Simple UPDATE builder and executor
+### UPDATE Builder and Helper
 
-`buildUpdate` / `sql.update` builder, and `update` executor
+`buildUpdate` / `sql.update` builder, and `update` helper
 
 ```js
 sql.update(tableName, { ...fieldValuePairs }, { ...whereCondition }); // => sql`UPDATE ...`
-db.update(tableName, { ...fieldValuePairs }, { ...whereCondition }); // => db.query`UPDATE ...`
+db.update(tableName, { ...fieldValuePairs }, { ...whereCondition });  // => db.query`UPDATE ...`
 ```
 
-### Simple DELETE builder and executor
+### DELETE Builder and Helper
 
-`buildDelete` / `sql.delete` builder, and `delete` executor
+`buildDelete` / `sql.delete` builder, and `delete` helper
 
 ```js
 sql.delete(tableName, { ...whereCondition }); // => sql`DELETE FROM ...`
-db.delete(tableName, { ...whereCondition }); // => db.query`DELETE FROM ...`
+db.delete(tableName, { ...whereCondition });  // => db.query`DELETE FROM ...`
 ```
 
-### API
+### Transaction Helper
 
-As you can see, an object built and constructed by `sql` keyword behave like a simple object with the following properties;
-`text`, `values`, and `embed`.
-
-Furthermore, the object also comes up with the following APIs;
-
-- `append(...)` / `push(...)`
-  - append a **raw SQL string** or an object created by `sql`, to the query
-- `join(glue = ', ')` / `prefix(prefix)` / `suffix(suffix)` / `empty(empty)`
-  - set glue/prefix/suffix/empty string for toString(), respectively
-- `setSewingPattern(prefix, glue, suffix, empty)`
-  - set sewing pattern for toString() at once
-- `toString(opts?)`
-  - constructs SQL string (by using sewing pattern and `opts` settings)
-
-To create the object;
-
-- `` sql`template string with ${value}` `` / `` json`{"a": "b", "c": ${value}}` ``
-  - creates a query object with values that will be automatically escaped
-- `sql(value, ...)` / `json(value)`
-  - creates a query object from only values that will be automatically escaped
-
-These APIs can be used, for example, to construct `IN` clause;
+`begin` helper
 
 ```js
-console.log(
-  sql`SELECT * FROM foobar WHERE foo IN (${sql(1, 2, 3).join()})`.embed,
-);
+db.begin(() => {
+    db.delete(...);
+    db.insert(...);
+});
+```
+
+If an error occurs, the transaction is safely rolled back.
+**NOTE:** Transactions can be nested, but only the outermost transaction is effective.
+
+## Low-level APIs
+
+An object created by the `sql` keyword behaves like a simple object with the following properties: `text`, `values`, and `embed`.
+
+In addition, the object provides the following APIs:
+
+- `append(...)` / `push(...)`
+  - Appends a **raw SQL string** or an object created by `sql` to the query.
+- `join(glue = ', ')` / `prefix(prefix)` / `suffix(suffix)` / `empty(empty)`
+  - Sets the glue, prefix, suffix, or empty string for `toString()`, respectively.
+- `setSewingPattern(prefix, glue, suffix, empty)`
+  - Sets the sewing pattern for `toString()` all at once.
+- `toString(opts?)`
+  - Constructs the SQL string using the sewing pattern and any provided `opts` settings.
+
+To create a query object, you can use:
+
+- `` sql`template string with ${value}` `` / `` json`{"a": "b", "c": ${value}}` ``
+  - Creates a query object with values that are automatically escaped.
+- `sql(value, ...)` / `json(value)`
+  - Creates a query object from values that are automatically escaped.
+
+These APIs can be used, for example, to construct an `IN` clause as follows:
+
+```ts
+import { sql } from 'query-weaver';
+
+console.log(sql`SELECT * FROM foobar WHERE foo IN (${sql(1, 2, 3).join()})`.embed);
 // SELECT * FROM foobar WHERE foo IN ('1', '2', '3')
 
 const a = [1, 2, 3];
@@ -215,58 +222,38 @@ console.log(sql`SELECT * FROM foobar WHERE foo IN (${sql(...a).join()})`.text);
 
 ### Caveats
 
-- Only `sql` and `json` accepts a template string literal.
-- The actual SQL statement executed on the database may differ between `[.text, .values]` and `.embed`, due to differences in serialize functions. If you really want to get the exact same statement, you can try this for example:
-
-```js
-import pgUtil from 'pg/lib/utils.js';
-import pgEscape from 'pg-escape';
-
-console.log(sql`SELECT ${[1, 2, 3, 4, 5]}`.embed);
-// SELECT ARRAY['1','2','3','4','5']
-
-console.log(sql`SELECT ${pgUtil.prepareValue([1, 2, 3, 4, 5])}`.embed);
-// SELECT '{"1","2","3","4","5"}'
-
-// or, pass a custom serialize function
-console.log(
-  sql`SELECT ${[1, 2, 3, 4, 5]}`.toString({
-    valueFn: (x) => pgEscape.literal(JSON.stringify(x)),
-  }),
-);
-// SELECT '[1,2,3,4,5]'
-```
+- Only `sql` and `json` accept a template string literal.
+- The actual SQL statement executed on the database may sometimes differ between `[.text, .values]` and `.embed` due to differences in serialization functions.
 
 ### DEBUG
 
-You can get access to the statements and results when using the Query Helper.
-I use the following code to record the session;
+You can easily access the statements and results when using the Query Helper. For example, the following code records the session:
 
 <!-- prettier-ignore -->
 ```js
 import zlib from 'node:zlib'
 
 const db = withQueryHelper(new pg.Pool(), {
-  onError: (ctx, error) => console.error(JSON.stringify({ error: zlib.gzipSync(JSON.stringify({ ... ctx, error })).toString('base64') })),
+  onError: (ctx, error) => console.error(JSON.stringify({ error: zlib.gzipSync(JSON.stringify({ ...ctx, error })).toString('base64') })),
   beforeQuery: (ctx) => console.log(JSON.stringify({ query: zlib.gzipSync(JSON.stringify(ctx)).toString('base64') })),
-  afterQuery: (ctx, result) => console.log(JSON.stringify({ result: zlib.gzipSync(JSON.stringify({ ... ctx, result })).toString('base64') })),
+  afterQuery: (ctx, result) => console.log(JSON.stringify({ result: zlib.gzipSync(JSON.stringify({ ...ctx, result })).toString('base64') })),
 });
 ```
 
-After that, you'll see something like this on the console;
+After running this, you will see output similar to the following in the console:
 
 <!-- prettier-ignore -->
 ```json
-{"query":"H4sIAAAAAAAAA6tWKkmtKFGyUgp29XF1DlHQUnAL8vdVSMvPT0osUgj3cA1yBXEUbBVUDJV0lMoSc0pTi5Wsog1jdZRSc5NSU4jRqm6oDtRblFpcmlMC1FytlJyfm5uYh9ALks0vd84vzQM6xRDMAVlSrQTUDxYAmghU7AQka2NrawEDVej4tQAAAA=="}
+{"query":"H4sIAAAAAAACA6tWKkmtKFGyUgp29XF1DlHQUnAL8vdVSMvPT0osUgj3cA1yBXEUbBVUDJV0lMoSc0pTi5Wsog1jdZRSc5NSU4jRqm6oDtRblFpcmgO0qlopOT83NzEPoRUkmV/unF+aB5Q2BHNAdlQrAbWDBYAGAhU7Acna2NpaABybVha0AAAA"}
 ```
 
-Now you can extract the contents by executing the following command;
+You can extract the contents by executing the following command:
 
 <!-- prettier-ignore -->
 ```sh
 % echo '... base64part' | base64 -d | zcat | jq -r .
 
-# or if you're using X11, select base64 part and then;
+# Or, if you're using X11, select the base64 part and then:
 % xclip -o | base64 -d | zcat | jq -r .
 ```
 
@@ -278,7 +265,7 @@ Now you can extract the contents by executing the following command;
     1
   ],
   "embed": "SELECT * FROM foobar WHERE foo = '1'",
-  "results": {
+  "result": {
     "command": "SELECT",
     "rowCount": 1,
     "rows": [
@@ -291,7 +278,7 @@ Now you can extract the contents by executing the following command;
 }
 ```
 
-It is very handy to replay the session like this;
+It is very handy to replay the session as follows:
 
 ```sh
 % xclip -o | base64 -d | zcat | jq -r .embed | psql
@@ -300,16 +287,13 @@ It is very handy to replay the session like this;
    1 | Bar
 (1 row)
 
-# Or, you can make a shell-script named `xclip-query` then
+# Or, you can create a shell script named `xclip-query` and then run:
 % xclip-query .embed | psql
 ```
 
-### Query Helper with custom `query` handler
+### Query Helper with a Custom `query` Function
 
-The final underlying `query` function can be changed by using `query` option.
-So you can use Prisma, TypeORM, or whatever you want if you write a query handler for them.
-
-Here are examples for using it;
+The underlying `query` function, which is used to perform queries, can be replaced by using the `query` option. This allows you to use Prisma, TypeORM, or any other query handler if you write one for it. For example:
 
 <!-- prettier-ignore -->
 ```js
@@ -331,9 +315,11 @@ console.log(await db.query`...`);
 
 <!-- prettier-ignore -->
 ```ts
-const queryable = async function (this: object, { text, values}: QueryConfig) {
+import { withQueryHelper } from 'query-weaver';
+
+const queryable = async function (this: object, { text, values }: QueryConfig) {
   return {
-    rows: [this], // `this` would be the object you passed to the constructor
+    rows: [this], // `this` will be the object you passed to the constructor
     rowCount: 1,
   }
 }
@@ -347,4 +333,4 @@ console.log(await db.getRow`HELLO QUERY`);
 ```
 
 That's it!
-Now you can use Query Weaver interfaces on them.
+Now you can use Query Weaver interfaces on the objects.
