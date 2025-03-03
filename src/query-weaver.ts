@@ -159,14 +159,14 @@ abstract class QueryFragmentBase implements QueryFragment {
       },
 
       sql: {
-        enumerable: true,
+        enumerable: false,
         get: () => {
           return this.#compile(() => '?');
         },
       },
 
       statement: {
-        enumerable: true,
+        enumerable: false,
         get: () => {
           let idx = 1;
           return this.#compile(() => ':' + idx++);
@@ -220,7 +220,6 @@ class QueryFragmentRawString extends QueryFragmentBase {
     this.#string = String(s);
   }
 
-  /* toString(_?: QueryFragmentToStringOptions) { */
   toString(opts?: QueryFragmentToStringOptions) {
     if (opts?.context && opts?.contextHandler) {
       opts.contextHandler(opts.context, this.#string);
