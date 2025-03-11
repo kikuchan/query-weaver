@@ -293,7 +293,7 @@ It is very handy to replay the session as follows:
 
 ### Query Helper with a Custom `query` Function
 
-The underlying `query` function, which is used to perform queries, can be replaced by using the `query` option. This allows you to use Prisma, TypeORM, or any other query handler if you write one for it. For example:
+The underlying `query` function, which is used to perform queries, can be replaced by using the `query` option. This allows you to use Prisma, TypeORM, or even raw SQLite object with Query Helper. For example:
 
 <!-- prettier-ignore -->
 ```js
@@ -308,6 +308,17 @@ console.log(await db.query`...`);
 ```js
 const db = withQueryHelper(new DataSource({ ... }), {
   query: QueryHelper.typeorm,
+});
+
+console.log(await db.query`...`);
+```
+
+<!-- prettier-ignore -->
+```js
+import { DatabaseSync } from 'node:sqlite';
+
+const db = withQueryHelper(new DatabaseSync(), {
+  query: QueryHelper.sqlite,
 });
 
 console.log(await db.query`...`);

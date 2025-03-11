@@ -4,14 +4,14 @@ import type {
   FieldValues,
   WhereArg,
   QueryTemplateStyle,
-} from './query-weaver';
+} from './query-weaver.ts';
 import {
   sql,
   buildInsert,
   buildUpdate,
   buildDelete,
   isQueryTemplateStyle,
-} from './query-weaver';
+} from './query-weaver.ts';
 
 export type QueryResultRow = pg.QueryResultRow;
 
@@ -26,6 +26,9 @@ export type QueryConfig = {
   text: string;
   values: unknown[];
   embed?: string;
+
+  sql?: string;
+  statement?: string;
 };
 
 type QueryableFunctionReturnType = Promise<QueryResult<QueryResultRow>>;
@@ -344,6 +347,18 @@ export class QueryHelper<X extends object = object> {
           rows,
           rowCount: rows.length,
         } as { rows: T[]; rowCount: number };
+      }
+      throw new Error('Invalid object');
+    };
+  }
+
+  public static get sqlite() {
+    return async function <T extends QueryResultRow>(this: object, config: QueryConfig) {
+      if ('prepare' in this && typeof this.prepare === 'function') {
+        const stmt = this.prepare(config.sql || config.text);
+        const rows: T[] = stmt.all(...config.values as string[]);
+
+        return { rows, rowCount: rows.length };
       }
       throw new Error('Invalid object');
     };

@@ -1,4 +1,4 @@
-import { quoteIdent, quoteLiteral } from './quote';
+import { quoteIdent, quoteLiteral } from './quote.ts';
 import { StringReader } from '@kikuchan/string-reader';
 
 type Context = {
