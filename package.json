@@ -19,8 +19,9 @@
     "clean": "rimraf dist",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "pnpm run clean && pnpm run build:esbuild && pnpm run build:types",
-    "build:esbuild": "node -r esbuild-register build.ts",
+    "build": "pnpm run clean && pnpm run build:esm && pnpm run build:cjs && pnpm run build:types",
+    "build:esm": "esbuild --bundle src/index.ts --format=esm --outfile=dist/index.esm.mjs --minify --sourcemap",
+    "build:cjs": "esbuild --bundle src/index.ts --format=cjs --outfile=dist/index.cjs.js  --minify --sourcemap",
     "build:types": "tsc --declaration --emitDeclarationOnly --declarationDir './dist'",
     "prepack": "pnpm run build && pnpm run test",
     "format": "biome format ./src",
@@ -35,16 +36,22 @@
   "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@kikuchan/string-reader": "0.1.0-alpha.1",
+    "@kikuchan/string-reader": "0.1.0-alpha.2",
+    "@types/node": "^22.13.10",
     "@types/pg": "^8.11.11",
-    "esbuild": "^0.25.0",
-    "esbuild-node-externals": "^1.18.0",
-    "esbuild-register": "^3.6.0",
+    "esbuild": "^0.25.1",
     "husky": "^9.1.7",
-    "lint-staged": "^15.4.3",
-    "pg": "^8.13.3",
+    "lint-staged": "^15.5.0",
+    "pg": "^8.14.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.8.2",
-    "vitest": "^3.0.7"
+    "vitest": "^3.0.8"
+  },
+  "packageManager": "pnpm@10.6.2+sha512.47870716bea1572b53df34ad8647b42962bc790ce2bf4562ba0f643237d7302a3d6a8ecef9e4bdfc01d23af1969aa90485d4cebb0b9638fa5ef1daef656f6c1b",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@biomejs/biome",
+      "esbuild"
+    ]
   }
 }

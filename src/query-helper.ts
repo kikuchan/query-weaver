@@ -353,10 +353,13 @@ export class QueryHelper<X extends object = object> {
   }
 
   public static get sqlite() {
-    return async function <T extends QueryResultRow>(this: object, config: QueryConfig) {
+    return async function <T extends QueryResultRow>(
+      this: object,
+      config: QueryConfig,
+    ) {
       if ('prepare' in this && typeof this.prepare === 'function') {
         const stmt = this.prepare(config.sql || config.text);
-        const rows: T[] = stmt.all(...config.values as string[]);
+        const rows: T[] = stmt.all(...(config.values as string[]));
 
         return { rows, rowCount: rows.length };
       }

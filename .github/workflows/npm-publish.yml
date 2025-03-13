@@ -16,7 +16,7 @@ jobs:
           registry-url: https://registry.npmjs.org/
       - uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 10
       - run: pnpm i --frozen-lockfile --strict-peer-dependencies
       - run: npm publish
         env:
