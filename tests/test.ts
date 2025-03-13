@@ -1,11 +1,11 @@
-import { sql, withQueryHelper, json, WHERE, OR, buildInsert } from '../src';
+import { sql, withQueryHelper, json, WHERE, OR, buildInsert, type QueryResult } from '../src';
 import { beforeEach, expect, test } from 'vitest';
 
 const queryable = {
   executed: [] as { text: string; values?: unknown[] }[],
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async query(cfg: { text: string; values?: unknown[] }): Promise<any> {
+  async query(cfg: { text: string; values?: unknown[] }): Promise<QueryResult<object>> {
     queryable.executed.push(cfg);
     return { rows: [{ text: cfg.text, values: cfg.values }], rowCount: 1 };
   },
