@@ -46,48 +46,44 @@ function pgContextHandler(ctx: Context, src: string): void {
 
   while (!r.eof()) {
     if (ctx.dollarQuoted) {
-      if (!r.skipUntil(ctx.dollarQuoted)) break;
-
-      r.skip(ctx.dollarQuoted.length);
+      if (!r.search(ctx.dollarQuoted)) break;
       ctx.dollarQuoted = undefined;
     } else if (ctx.inEscapedSingleQuote) {
       if (!r.skipUntil(/[\\']/)) break;
       if (r.match("''")) continue; // ignore double single-quote
-      if (r.match('\\')) {
-        r.skip(); // just skip the escaped letter
-        continue;
-      }
+      if (r.match(/\\./)) continue; // skip the escaped string
 
-      // must be the ending single-quote
-      r.skip();
+      // must be the ending of the single-quote
+      if (!r.match("'")) break;
       ctx.inEscapedSingleQuote = false;
     } else if (ctx.inSingleQuote) {
       if (!r.skipUntil("'")) break;
       if (r.match("''")) continue; // ignore double single-quote
 
-      // must be the ending single-quote
-      r.skip();
+      // must be the ending of the single-quote
+      if (!r.match("'")) break;
       ctx.inSingleQuote = false;
     } else if (ctx.inBlockComment) {
       if (!r.skipUntil(/\/\*|\*\//)) break;
-      if (r.match('/*', () => ctx!.inBlockComment!++)) continue;
+      if (r.match('/*', () => ++ctx!.inBlockComment!)) continue;
 
-      r.skip(2);
+      // must be the ending of the block comment
+      if (!r.match('*/')) break;
       ctx.inBlockComment--;
     } else if (ctx.inLineComment) {
-      if (!r.skipUntil('\n')) break;
-
-      r.skip();
+      if (!r.search(/\r\n|\r|\n/)) break;
       ctx.inLineComment = false;
     } else {
       if (!r.skipUntil(/[-$E'/]/)) break;
 
-      if (r.match(/\$[a-zA-Z]*\$/, (m) => (ctx.dollarQuoted = m[0]))) continue;
+      if (r.match(/\$[a-zA-Z0-9_]*\$/, (m) => (ctx.dollarQuoted = m[0])))
+        continue;
       if (r.match("E'", () => (ctx.inEscapedSingleQuote = true))) continue;
       if (r.match("'", () => (ctx.inSingleQuote = true))) continue;
       if (r.match('--', () => (ctx.inLineComment = true))) continue;
       if (r.match('/*', () => (ctx.inBlockComment = 1))) continue;
 
+      // not a known token
       r.skip();
     }
   }
@@ -443,7 +439,9 @@ export function json(
           texts.map(makeRaw),
           values.map(makeJsonValue),
         ),
-        { wrapperFn },
+        {
+          wrapperFn,
+        },
       ),
     ];
   } else {
