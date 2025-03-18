@@ -207,7 +207,6 @@ class QueryFragmentIdent extends QueryFragmentBase {
   }
 }
 
-// we exploits String constructor
 class QueryFragmentRawString extends QueryFragmentBase {
   #string: string;
 
@@ -495,7 +494,6 @@ export function buildClauses(...args: WhereArg[]) {
           continue;
         }
 
-        // それ以外
         clauses.push(sql`${makeIdent(key)} = ${val[key]}`);
       }
       return;
