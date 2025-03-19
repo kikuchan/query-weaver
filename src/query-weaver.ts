@@ -563,7 +563,7 @@ export function buildValues(fvs: (FieldValues | unknown[])[]) {
   return sql`VALUES ${values}`;
 }
 
-export function buildKeys(fvs: FieldValues[] | FieldValues) {
+function fvsKeys(fvs: FieldValues[] | FieldValues) {
   if (!Array.isArray(fvs)) fvs = [fvs];
   if (fvs.length == 0 || !fvs[0] || typeof fvs[0] !== 'object')
     throw new Error('Invalid call of the function');
@@ -575,10 +575,14 @@ export function buildKeys(fvs: FieldValues[] | FieldValues) {
   const ks = Object.keys(fvs[0]);
   const sig = ks.join();
   if (fvs.some((fv) => Object.keys(fv).join() !== sig)) {
-    throw new Error('buildKeys: All objects must have the same keys');
+    throw new Error('All objects must have the same keys');
   }
 
-  return sql(...ks.map(makeIdent)).setSewingPattern('(', ', ', ')');
+  return ks;
+}
+
+export function buildKeys(fvs: FieldValues[] | FieldValues) {
+  return sql(...fvsKeys(fvs).map(makeIdent)).setSewingPattern('(', ', ', ')');
 }
 
 export function buildInsert(
@@ -588,10 +592,10 @@ export function buildInsert(
 ) {
   if (!Array.isArray(fvs)) fvs = [fvs];
 
-  const keys = buildKeys(fvs);
-  const values = buildValues(fvs.map(Object.values));
+  const fields = buildKeys(fvs);
+  const VALUES = buildValues(fvs.map(Object.values));
 
-  return sql`INSERT INTO ${makeIdent(table)} ${keys} ${values}`
+  return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES}`
     .append(appendix)
     .join(' ');
 }
@@ -626,6 +630,34 @@ export function buildDelete(
     .join(' ');
 }
 
+export function buildUpsert(
+  table: string,
+  fvs: FieldValues[] | FieldValues,
+  onConflictKeys: string[],
+  appendix?: string | QueryFragment,
+) {
+  if (!Array.isArray(fvs)) fvs = [fvs];
+
+  const fields = buildKeys(fvs);
+  const VALUES = buildValues(fvs.map(Object.values));
+
+  const ON_CONFLICT = sql(...onConflictKeys.map(makeIdent)).setSewingPattern(
+    'ON CONFLICT (',
+    ', ',
+    ')',
+  );
+
+  const DO_UPDATE_SET = sql(
+    ...fvsKeys(fvs)
+      .filter((x) => !onConflictKeys.includes(x))
+      .map((k) => sql`${ident(k)} = EXCLUDED.${ident(k)}`),
+  ).setSewingPattern('DO UPDATE SET ', ', ');
+
+  return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES} ${ON_CONFLICT} ${DO_UPDATE_SET}`
+    .append(appendix)
+    .join(' ');
+}
+
 // aliases
 export const or = OR;
 export const and = AND;
@@ -651,6 +683,7 @@ sql.or = or;
 sql.insert = buildInsert;
 sql.update = buildUpdate;
 sql.delete = buildDelete;
+sql.upsert = buildUpsert;
 sql.keys = buildKeys;
 sql.values = buildValues;
 sql.UNION_ALL = UNION_ALL;
@@ -676,6 +709,8 @@ export default {
   buildInsert,
   buildUpdate,
   buildDelete,
+  buildUpsert,
+  buildKeys,
   buildValues,
   UNION_ALL,
   UNION,

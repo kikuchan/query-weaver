@@ -10,6 +10,7 @@ import {
   buildInsert,
   buildUpdate,
   buildDelete,
+  buildUpsert,
   isQueryTemplateStyle,
 } from './query-weaver.ts';
 
@@ -158,10 +159,10 @@ export class QueryHelper<X extends object = object> {
    */
   async insert<T extends QueryResultRow>(
     table: string,
-    fv: FieldValues,
+    fvs: FieldValues | FieldValues[],
     appendix?: string | QueryFragment,
   ) {
-    const query = buildInsert(table, fv, appendix);
+    const query = buildInsert(table, fvs, appendix);
     return await this.#query<T>([query]);
   }
 
@@ -193,6 +194,22 @@ export class QueryHelper<X extends object = object> {
     appendix?: string | QueryFragment,
   ) {
     const query = buildDelete(table, where, appendix);
+    return await this.#query<T>([query]);
+  }
+
+  /**
+   * Upsert (INSERT ... ON CONFLICT) builder
+   *
+   * @example
+   *   await db.upsert('table', { id: '1' name: 'myname' }, ['id'], 'RETURNING *');
+   */
+  async upsert<T extends QueryResultRow>(
+    table: string,
+    fvs: FieldValues | FieldValues[],
+    onConflictKeys: string[],
+    appendix?: string | QueryFragment,
+  ) {
+    const query = buildUpsert(table, fvs, onConflictKeys, appendix);
     return await this.#query<T>([query]);
   }
 
@@ -371,10 +388,10 @@ export class QueryHelper<X extends object = object> {
 type Overwrite<T, Q> = Omit<T, keyof Q> & Q;
 type MethodChainRewrite<T, Q> = {
   [K in keyof T]: T[K] extends (...args: infer R) => T
-    ? (...args: R) => Override<T, Q>
-    : T[K] extends T
-      ? Override<T, Q>
-      : T[K];
+  ? (...args: R) => Override<T, Q>
+  : T[K] extends T
+  ? Override<T, Q>
+  : T[K];
 };
 type Override<T, Q> = Overwrite<MethodChainRewrite<T, Q>, Q>;
 
@@ -409,7 +426,7 @@ export function withQueryHelper<T extends object>(
       const value = target && Reflect.get(target, key);
 
       if (value && value instanceof Function) {
-        return function (this: unknown, ...args: unknown[]) {
+        return function(this: unknown, ...args: unknown[]) {
           const result = value.apply(this === receiver ? target : this, args);
           return result === db ? proxy : result;
         };
