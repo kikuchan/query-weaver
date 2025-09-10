@@ -1,18 +1,6 @@
 import type pg from 'pg';
-import type {
-  QueryFragment,
-  FieldValues,
-  WhereArg,
-  QueryTemplateStyle,
-} from './query-weaver.ts';
-import {
-  sql,
-  buildInsert,
-  buildUpdate,
-  buildDelete,
-  buildUpsert,
-  isQueryTemplateStyle,
-} from './query-weaver.ts';
+import type { FieldValues, QueryFragment, QueryTemplateStyle, WhereArg } from './query-weaver.ts';
+import { buildDelete, buildInsert, buildUpdate, buildUpsert, isQueryTemplateStyle, sql } from './query-weaver.ts';
 
 export type QueryResultRow = pg.QueryResultRow;
 
@@ -33,21 +21,14 @@ export type QueryConfig = {
 };
 
 type QueryableFunctionReturnType = Promise<QueryResult<QueryResultRow>>;
-type QueryableFunctionWithoutThis = (
-  queryConfig: QueryConfig,
-) => QueryableFunctionReturnType;
-type QueryableFunctionWithThis<T extends object> = (
-  this: T,
-  queryConfig: QueryConfig,
-) => QueryableFunctionReturnType;
+type QueryableFunctionWithoutThis = (queryConfig: QueryConfig) => QueryableFunctionReturnType;
+type QueryableFunctionWithThis<T extends object> = (this: T, queryConfig: QueryConfig) => QueryableFunctionReturnType;
 
 type QueryableWithThis<T extends object> = {
   query: QueryableFunctionWithThis<T>;
 };
 
-export type QueryableFunction<T extends object> =
-  | QueryableFunctionWithoutThis
-  | QueryableFunctionWithThis<T>;
+export type QueryableFunction<T extends object> = QueryableFunctionWithoutThis | QueryableFunctionWithThis<T>;
 export type Queryable<T extends object> = {
   query: QueryableFunction<T>;
 };
@@ -60,10 +41,7 @@ type pgQueryResult<X, T extends QueryResultRow> = (X extends {
 
 export type QueryHelperOptions = {
   beforeQuery?: <T extends QueryConfig>(ctx: T) => void;
-  afterQuery?: <T extends QueryConfig, R extends QueryResultRow>(
-    ctx: T,
-    r: QueryResult<R>,
-  ) => void;
+  afterQuery?: <T extends QueryConfig, R extends QueryResultRow>(ctx: T, r: QueryResult<R>) => void;
   onError?: <T extends QueryConfig>(ctx: T, e: unknown) => void;
 };
 
@@ -72,10 +50,7 @@ type QueryTemplateOrSimpleQuery =
   | [query: string, values?: unknown[]]
   | [query: pg.QueryConfig<unknown[]>];
 
-function pick<T extends { [X in string]: T[X] }, K extends string>(
-  target: T,
-  keys: K[],
-): { [X in K]: T[X] } {
+function pick<T extends { [X in string]: T[X] }, K extends string>(target: T, keys: K[]): { [X in K]: T[X] } {
   return Object.fromEntries(keys.map((k) => [k, target[k]])) as {
     [X in K]: T[X];
   };
@@ -124,9 +99,7 @@ export class QueryHelper<X extends object = object> {
     return queryFn.call(this.#db, query);
   }
 
-  async #query<T extends QueryResultRow>(
-    args: QueryTemplateOrSimpleQuery,
-  ): Promise<pgQueryResult<X, T>> {
+  async #query<T extends QueryResultRow>(args: QueryTemplateOrSimpleQuery): Promise<pgQueryResult<X, T>> {
     const query = this.#parseQueryTemplateStyle(args);
 
     this.#opts?.beforeQuery?.(query);
@@ -140,10 +113,7 @@ export class QueryHelper<X extends object = object> {
       results.rowCount = results.rows?.length ?? 0;
     }
 
-    this.#opts?.afterQuery?.(
-      query,
-      pick(results, ['command', 'rowCount', 'rows']),
-    );
+    this.#opts?.afterQuery?.(query, pick(results, ['command', 'rowCount', 'rows']));
 
     return results as pgQueryResult<X, T>;
   }
@@ -188,11 +158,7 @@ export class QueryHelper<X extends object = object> {
    * @example
    *   await db.delete('table', { id: 'root' }, 'RETURNING *');
    */
-  async delete<T extends QueryResultRow>(
-    table: string,
-    where: WhereArg,
-    appendix?: string | QueryFragment,
-  ) {
+  async delete<T extends QueryResultRow>(table: string, where: WhereArg, appendix?: string | QueryFragment) {
     const query = buildDelete(table, where, appendix);
     return await this.#query<T>([query]);
   }
@@ -255,9 +221,7 @@ export class QueryHelper<X extends object = object> {
    *     => 10
    */
   async getOne<T = unknown>(...args: QueryTemplateOrSimpleQuery) {
-    return this.#query<[T]>(args).then(
-      (x) => Object.values(x.rows?.[0] ?? {})?.[0] as T | undefined,
-    );
+    return this.#query<[T]>(args).then((x) => Object.values(x.rows?.[0] ?? {})?.[0] as T | undefined);
   }
 
   /**
@@ -326,10 +290,7 @@ export class QueryHelper<X extends object = object> {
       this: object,
       { text, values }: QueryConfig,
     ): Promise<QueryResult<T>> {
-      if (
-        '$queryRawUnsafe' in this &&
-        typeof this.$queryRawUnsafe === 'function'
-      ) {
+      if ('$queryRawUnsafe' in this && typeof this.$queryRawUnsafe === 'function') {
         const rows: T[] = await this.$queryRawUnsafe(text, ...values);
         return {
           rows: rows,
@@ -352,11 +313,7 @@ export class QueryHelper<X extends object = object> {
         const rows: unknown[] = await this.query(text, values);
 
         // returns with row count
-        if (
-          rows.length === 2 &&
-          Array.isArray(rows[0]) &&
-          typeof rows[1] === 'number'
-        ) {
+        if (rows.length === 2 && Array.isArray(rows[0]) && typeof rows[1] === 'number') {
           return { rows: rows[0], rowCount: rows[1] };
         }
 
@@ -370,10 +327,7 @@ export class QueryHelper<X extends object = object> {
   }
 
   public static get sqlite() {
-    return async function <T extends QueryResultRow>(
-      this: object,
-      config: QueryConfig,
-    ) {
+    return async function <T extends QueryResultRow>(this: object, config: QueryConfig) {
       if ('prepare' in this && typeof this.prepare === 'function') {
         const stmt = this.prepare(config.sql || config.text);
         const rows: T[] = stmt.all(...(config.values as string[]));
@@ -388,17 +342,14 @@ export class QueryHelper<X extends object = object> {
 type Overwrite<T, Q> = Omit<T, keyof Q> & Q;
 type MethodChainRewrite<T, Q> = {
   [K in keyof T]: T[K] extends (...args: infer R) => T
-  ? (...args: R) => Override<T, Q>
-  : T[K] extends T
-  ? Override<T, Q>
-  : T[K];
+    ? (...args: R) => Override<T, Q>
+    : T[K] extends T
+      ? Override<T, Q>
+      : T[K];
 };
 type Override<T, Q> = Overwrite<MethodChainRewrite<T, Q>, Q>;
 
-export type WithQueryHelper<T extends object = object> = Override<
-  T,
-  QueryHelper<T>
->;
+export type WithQueryHelper<T extends object = object> = Override<T, QueryHelper<T>>;
 
 /**
  * Returns a proxy object that overrides the queryable instance `db` by Query Helper utilities
@@ -426,7 +377,7 @@ export function withQueryHelper<T extends object>(
       const value = target && Reflect.get(target, key);
 
       if (value && value instanceof Function) {
-        return function(this: unknown, ...args: unknown[]) {
+        return function (this: unknown, ...args: unknown[]) {
           const result = value.apply(this === receiver ? target : this, args);
           return result === db ? proxy : result;
         };

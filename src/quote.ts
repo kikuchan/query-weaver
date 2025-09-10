@@ -148,10 +148,7 @@ const reservedKeywords = [
 ];
 
 export function quoteIdent(id: string) {
-  if (
-    id.match(/^[a-zA-Z_][0-9a-zA-Z_$]*$/) &&
-    !reservedKeywords.includes(id.toUpperCase())
-  ) {
+  if (id.match(/^[a-zA-Z_][0-9a-zA-Z_$]*$/) && !reservedKeywords.includes(id.toUpperCase())) {
     return id;
   }
   return `"${id.replace(/"/g, '""')}"`;

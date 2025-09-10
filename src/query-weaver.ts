@@ -1,5 +1,5 @@
-import { quoteIdent, quoteLiteral } from './quote.ts';
 import { StringReader } from '@kikuchan/string-reader';
+import { quoteIdent, quoteLiteral } from './quote.ts';
 
 type Context = {
   inLineComment?: boolean;
@@ -11,12 +11,7 @@ type Context = {
 
 type EscapeFunction = (v: unknown, context?: Context) => string;
 export type FieldValues = Record<string, unknown>;
-export type WhereArg =
-  | string
-  | FieldValues
-  | QueryFragment
-  | undefined
-  | WhereArg[];
+export type WhereArg = string | FieldValues | QueryFragment | undefined | WhereArg[];
 
 export function pgIdent(s: string, _ctx?: Context) {
   // '.' is a special for us
@@ -30,8 +25,7 @@ export function pgIdent(s: string, _ctx?: Context) {
 export function pgString(s: unknown, _ctx?: Context): string {
   if (s === null) return 'NULL';
   if (typeof s === 'boolean') return s ? 'true' : 'false';
-  if (Array.isArray(s))
-    return 'ARRAY[' + s.map((e) => pgString(e)).join(',') + ']';
+  if (Array.isArray(s)) return 'ARRAY[' + s.map((e) => pgString(e)).join(',') + ']';
   if (typeof s === 'object') {
     if ('toJSON' in s && typeof s.toJSON === 'function') {
       return quoteLiteral(s.toJSON());
@@ -76,8 +70,7 @@ function pgContextHandler(ctx: Context, src: string): void {
     } else {
       if (!r.skipUntil(/[-$E'/]/)) break;
 
-      if (r.match(/\$[a-zA-Z0-9_]*\$/, (m) => (ctx.dollarQuoted = m[0])))
-        continue;
+      if (r.match(/\$[a-zA-Z0-9_]*\$/, (m) => (ctx.dollarQuoted = m[0]))) continue;
       if (r.match("E'", () => (ctx.inEscapedSingleQuote = true))) continue;
       if (r.match("'", () => (ctx.inSingleQuote = true))) continue;
       if (r.match('--', () => (ctx.inLineComment = true))) continue;
@@ -256,27 +249,17 @@ type QueryFragmentsOptions = {
   wrapperFn?: (s: string, opts?: QueryFragmentToStringOptions) => string;
 };
 
-export type QueryTemplateStyle = [
-  text: TemplateStringsArray,
-  ...values: unknown[],
-];
-export const isQueryTemplateStyle = (
-  args: unknown,
-): args is QueryTemplateStyle => {
+export type QueryTemplateStyle = [text: TemplateStringsArray, ...values: unknown[]];
+export const isQueryTemplateStyle = (args: unknown): args is QueryTemplateStyle => {
   if (!Array.isArray(args)) return false;
-  if (typeof args?.[0] !== 'object' || args[0] === null || !('raw' in args[0]))
-    return false;
+  if (typeof args?.[0] !== 'object' || args[0] === null || !('raw' in args[0])) return false;
   if (!Array.isArray(args[0])) return false;
   const [texts, ...values] = args;
   return texts.length - 1 === values.length;
 };
 
-function sewTemplateTextsAndValues<T = unknown, R = unknown>(
-  texts: T[],
-  values: R[],
-) {
-  if (texts.length - 1 !== values.length)
-    throw new Error('Invalid call of the function');
+function sewTemplateTextsAndValues<T = unknown, R = unknown>(texts: T[], values: R[]) {
+  if (texts.length - 1 !== values.length) throw new Error('Invalid call of the function');
   return texts.flatMap((text, idx) => (idx ? [values[idx - 1], text] : [text]));
 }
 
@@ -285,10 +268,7 @@ export class QueryFragments extends QueryFragmentBase {
   #opts: Required<QueryFragmentsOptions>;
 
   constructor(
-    ...args:
-      | []
-      | [values: (QueryFragment | undefined)[], opts?: QueryFragmentsOptions]
-      | [opts?: QueryFragmentsOptions]
+    ...args: [] | [values: (QueryFragment | undefined)[], opts?: QueryFragmentsOptions] | [opts?: QueryFragmentsOptions]
   ) {
     super();
     this.#opts = {
@@ -300,10 +280,7 @@ export class QueryFragments extends QueryFragmentBase {
     };
 
     if (Array.isArray(args[0])) {
-      const [values, opts] = args as [
-        values: (QueryFragment | undefined)[],
-        opts?: QueryFragmentsOptions,
-      ];
+      const [values, opts] = args as [values: (QueryFragment | undefined)[], opts?: QueryFragmentsOptions];
       this.#opts = { ...this.#opts, ...opts };
       this.push(...values);
     } else {
@@ -312,20 +289,13 @@ export class QueryFragments extends QueryFragmentBase {
     }
   }
 
-  setSewingPattern(
-    prefix: string = '',
-    glue: string = '',
-    suffix: string = '',
-    empty: string = '',
-  ) {
+  setSewingPattern(prefix: string = '', glue: string = '', suffix: string = '', empty: string = '') {
     this.#opts = { ...this.#opts, prefix, glue, suffix, empty };
     return this;
   }
 
   push(...args: (QueryFragment | string | undefined)[]) {
-    this.#list.push(
-      ...(args.map(makeRaw).filter((x) => x !== undefined) as QueryFragment[]),
-    );
+    this.#list.push(...(args.map(makeRaw).filter((x) => x !== undefined) as QueryFragment[]));
     return this;
   }
 
@@ -360,11 +330,7 @@ export class QueryFragments extends QueryFragmentBase {
       .filter((x) => x)
       .join(this.#opts.glue);
     if (!children) return this.#opts.empty;
-    return (
-      this.#opts.prefix +
-      this.#opts.wrapperFn(children, opts) +
-      this.#opts.suffix
-    );
+    return this.#opts.prefix + this.#opts.wrapperFn(children, opts) + this.#opts.suffix;
   }
 }
 
@@ -372,23 +338,14 @@ export class QueryFragments extends QueryFragmentBase {
  * SQL template tag
  */
 export function sql(
-  ...args:
-    | [texts: TemplateStringsArray, ...values: unknown[]]
-    | [...values: unknown[]]
+  ...args: [texts: TemplateStringsArray, ...values: unknown[]] | [...values: unknown[]]
 ): QueryFragments {
   let fragments: (QueryFragment | undefined)[];
   if (isQueryTemplateStyle(args)) {
     // sql`...` comes here
-    const [texts, ...values] = args as [
-      texts: TemplateStringsArray,
-      values: unknown[],
-    ];
+    const [texts, ...values] = args as [texts: TemplateStringsArray, values: unknown[]];
     // template string looks like a single QueryFragment for user
-    fragments = [
-      new QueryFragments(
-        sewTemplateTextsAndValues(texts.map(makeRaw), values.map(makeValue)),
-      ),
-    ];
+    fragments = [new QueryFragments(sewTemplateTextsAndValues(texts.map(makeRaw), values.map(makeValue)))];
   } else {
     // normal function call
     fragments = args.map(makeValue);
@@ -422,32 +379,19 @@ export function raw(...args: unknown[]) {
  *   json｀{"obj": ${ 'abc' }}｀
  *     => '{"obj": "abc"}'
  */
-export function json(
-  ...args:
-    | [...json: unknown[]]
-    | [texts: TemplateStringsArray, ...args: unknown[]]
-) {
+export function json(...args: [...json: unknown[]] | [texts: TemplateStringsArray, ...args: unknown[]]) {
   let fragments: (QueryFragment | undefined)[];
-  const wrapperFn = (x: string, opts?: QueryFragmentToStringOptions) =>
-    (opts?.valueFn || pgString)(x, opts?.context);
+  const wrapperFn = (x: string, opts?: QueryFragmentToStringOptions) => (opts?.valueFn || pgString)(x, opts?.context);
   if (isQueryTemplateStyle(args)) {
     const [texts, ...values] = args;
     fragments = [
-      new QueryFragments(
-        sewTemplateTextsAndValues(
-          texts.map(makeRaw),
-          values.map(makeJsonValue),
-        ),
-        {
-          wrapperFn,
-        },
-      ),
+      new QueryFragments(sewTemplateTextsAndValues(texts.map(makeRaw), values.map(makeJsonValue)), {
+        wrapperFn,
+      }),
     ];
   } else {
     // normal function call
-    fragments = args.map(
-      (x) => new QueryFragments([makeJsonValue(x)], { wrapperFn }),
-    );
+    fragments = args.map((x) => new QueryFragments([makeJsonValue(x)], { wrapperFn }));
   }
 
   return new QueryFragments(fragments);
@@ -543,12 +487,10 @@ export function OFFSET(offset: number | string | null | undefined) {
 
 export function buildValues(fvs: (FieldValues | unknown[])[]) {
   if (!Array.isArray(fvs)) {
-    if (typeof fvs !== 'object')
-      throw new Error('buildValues: The argument must be an array');
+    if (typeof fvs !== 'object') throw new Error('buildValues: The argument must be an array');
     fvs = [fvs];
   }
-  if (fvs.length === 0)
-    throw new Error('buildValues: Array must contain elements at least one');
+  if (fvs.length === 0) throw new Error('buildValues: Array must contain elements at least one');
 
   const array = fvs.map((x) => (typeof x === 'object' ? Object.values(x) : x));
 
@@ -557,20 +499,15 @@ export function buildValues(fvs: (FieldValues | unknown[])[]) {
     throw new Error('buildValues: Array must all be the same length');
   }
 
-  const values = sql(
-    ...array.map((v) => sql(...v).join(', ')),
-  ).setSewingPattern('(', '), (', ')');
+  const values = sql(...array.map((v) => sql(...v).join(', '))).setSewingPattern('(', '), (', ')');
   return sql`VALUES ${values}`;
 }
 
 function fvsKeys(fvs: FieldValues[] | FieldValues) {
   if (!Array.isArray(fvs)) fvs = [fvs];
-  if (fvs.length == 0 || !fvs[0] || typeof fvs[0] !== 'object')
-    throw new Error('Invalid call of the function');
+  if (fvs.length == 0 || !fvs[0] || typeof fvs[0] !== 'object') throw new Error('Invalid call of the function');
 
-  fvs = fvs.map((fv) =>
-    Object.fromEntries(Object.entries(fv).filter(([_, v]) => v !== undefined)),
-  );
+  fvs = fvs.map((fv) => Object.fromEntries(Object.entries(fv).filter(([_, v]) => v !== undefined)));
 
   const ks = Object.keys(fvs[0]);
   const sig = ks.join();
@@ -585,27 +522,16 @@ export function buildKeys(fvs: FieldValues[] | FieldValues) {
   return sql(...fvsKeys(fvs).map(makeIdent)).setSewingPattern('(', ', ', ')');
 }
 
-export function buildInsert(
-  table: string,
-  fvs: FieldValues[] | FieldValues,
-  appendix?: string | QueryFragment,
-) {
+export function buildInsert(table: string, fvs: FieldValues[] | FieldValues, appendix?: string | QueryFragment) {
   if (!Array.isArray(fvs)) fvs = [fvs];
 
   const fields = buildKeys(fvs);
   const VALUES = buildValues(fvs.map(Object.values));
 
-  return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES}`
-    .append(appendix)
-    .join(' ');
+  return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES}`.append(appendix).join(' ');
 }
 
-export function buildUpdate(
-  table: string,
-  fv: FieldValues,
-  where?: WhereArg,
-  appendix?: string | QueryFragment,
-) {
+export function buildUpdate(table: string, fv: FieldValues, where?: WhereArg, appendix?: string | QueryFragment) {
   const pairs = new QueryFragments();
 
   for (const k in fv) {
@@ -615,19 +541,11 @@ export function buildUpdate(
     pairs.push(sql`${makeIdent(k)} = ${val}`);
   }
 
-  return sql`UPDATE ${makeIdent(table)} SET ${pairs.join(', ')} ${WHERE(where)}`
-    .append(appendix)
-    .join(' ');
+  return sql`UPDATE ${makeIdent(table)} SET ${pairs.join(', ')} ${WHERE(where)}`.append(appendix).join(' ');
 }
 
-export function buildDelete(
-  table: string,
-  where?: WhereArg,
-  appendix?: string | QueryFragment,
-) {
-  return sql`DELETE FROM ${makeIdent(table)} ${WHERE(where)}`
-    .append(appendix)
-    .join(' ');
+export function buildDelete(table: string, where?: WhereArg, appendix?: string | QueryFragment) {
+  return sql`DELETE FROM ${makeIdent(table)} ${WHERE(where)}`.append(appendix).join(' ');
 }
 
 export function buildUpsert(
@@ -641,11 +559,7 @@ export function buildUpsert(
   const fields = buildKeys(fvs);
   const VALUES = buildValues(fvs.map(Object.values));
 
-  const ON_CONFLICT = sql(...onConflictKeys.map(makeIdent)).setSewingPattern(
-    'ON CONFLICT (',
-    ', ',
-    ')',
-  );
+  const ON_CONFLICT = sql(...onConflictKeys.map(makeIdent)).setSewingPattern('ON CONFLICT (', ', ', ')');
 
   const DO_UPDATE_SET = sql(
     ...fvsKeys(fvs)
@@ -665,55 +579,3 @@ export const where = WHERE;
 export const WHERE_AND = WHERE;
 export const where_and = WHERE;
 export const where_or = WHERE_OR;
-
-// expose via `sql`
-sql.raw = raw;
-sql.ident = ident;
-sql.json = json;
-sql.WHERE = WHERE;
-sql.WHERE_AND = WHERE_AND;
-sql.WHERE_OR = WHERE_OR;
-sql.AND = AND;
-sql.OR = OR;
-sql.where = where;
-sql.where_and = where_and;
-sql.where_or = where_or;
-sql.and = and;
-sql.or = or;
-sql.insert = buildInsert;
-sql.update = buildUpdate;
-sql.delete = buildDelete;
-sql.upsert = buildUpsert;
-sql.keys = buildKeys;
-sql.values = buildValues;
-sql.UNION_ALL = UNION_ALL;
-sql.UNION = UNION;
-sql.LIMIT = LIMIT;
-sql.OFFSET = OFFSET;
-
-export default {
-  sql,
-  raw,
-  ident,
-  json,
-  WHERE,
-  WHERE_AND,
-  WHERE_OR,
-  AND,
-  OR,
-  where,
-  where_and,
-  where_or,
-  and,
-  or,
-  buildInsert,
-  buildUpdate,
-  buildDelete,
-  buildUpsert,
-  buildKeys,
-  buildValues,
-  UNION_ALL,
-  UNION,
-  LIMIT,
-  OFFSET,
-};
