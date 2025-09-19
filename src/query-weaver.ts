@@ -259,7 +259,7 @@ export const isQueryTemplateStyle = (args: unknown): args is QueryTemplateStyle 
 };
 
 function sewTemplateTextsAndValues<T = unknown, R = unknown>(texts: T[], values: R[]) {
-  if (texts.length - 1 !== values.length) throw new Error('Invalid call of the function');
+  if (texts.length - 1 !== values.length) throw new Error('Template literal received a mismatched number of values.');
   return texts.flatMap((text, idx) => (idx ? [values[idx - 1], text] : [text]));
 }
 
@@ -437,9 +437,9 @@ export function buildClauses(...args: WhereArg[]) {
           const arrayValues = val[key] as unknown[];
           if (arrayValues.length === 0) {
             clauses.push(sql`FALSE`);
-            continue;
+          } else {
+            clauses.push(sql`${makeIdent(key)} = ANY (${arrayValues})`);
           }
-          clauses.push(sql`${makeIdent(key)} = ANY (${arrayValues})`);
           continue;
         }
 
@@ -495,47 +495,36 @@ type ExtractedFieldRows = { keys?: string[]; rows: unknown[][] };
 function extractFieldRows(input: FieldValues[] | FieldValues | (FieldValues | unknown[])[]): ExtractedFieldRows {
   const list = (Array.isArray(input) ? input : [input]) as (FieldValues | unknown[])[];
   if (list.length === 0) {
-    throw new Error('Invalid call of the function');
+    throw new Error('At least one field value is required.');
   }
 
   const first = list[0];
 
-  if (Array.isArray(first)) {
-    const rows = list.map((row) => {
-      if (!Array.isArray(row)) {
-        throw new Error('All rows must be arrays');
-      }
-      return row;
-    });
-    const sig = rows[0]?.length ?? 0;
-    if (rows.some((row) => row.length !== sig)) {
-      throw new Error('All arrays must have the same length');
-    }
-    return { rows };
+  const isArray = first && Array.isArray(first);
+  if (!first || (!isArray && typeof first !== 'object')) {
+    throw new Error('Field values must be arrays or plain objects.');
   }
 
-  if (!first || typeof first !== 'object') {
-    throw new Error('Invalid call of the function');
-  }
-
-  const normalizedObjects = list.map((fv) => {
-    if (!fv || typeof fv !== 'object' || Array.isArray(fv)) {
-      throw new Error('Invalid call of the function');
-    }
-    return Object.fromEntries(Object.entries(fv).filter(([, v]) => v !== undefined)) as FieldValues;
+  const objects = list.map((row) => {
+    if (Array.isArray(row) !== isArray) throw new Error('All entries must share the same structure.');
+    return Object.fromEntries(
+      (Array.isArray(row) ? row.map((col, idx) => [String(idx), col]) : Object.entries(row)).filter(
+        ([, col]) => col !== undefined,
+      ),
+    );
   });
 
-  const keys = Object.keys(normalizedObjects[0]);
+  const keys = Object.keys(objects[0]);
 
-  const rows = normalizedObjects.map((row) => {
+  const rows = objects.map((row) => {
     const rowKeys = Object.keys(row);
     if (rowKeys.length !== keys.length) {
-      throw new Error('All objects must have the same keys');
+      throw new Error('All entries must share the same structure.');
     }
 
     const values = keys.map((key) => {
       if (!Object.prototype.hasOwnProperty.call(row, key)) {
-        throw new Error('All objects must have the same keys');
+        throw new Error('All entries must share the same structure.');
       }
       return row[key];
     });
@@ -543,12 +532,7 @@ function extractFieldRows(input: FieldValues[] | FieldValues | (FieldValues | un
     return values;
   });
 
-  const sig = rows[0]?.length ?? 0;
-  if (rows.some((row) => row.length !== sig)) {
-    throw new Error('All arrays must have the same length');
-  }
-
-  return { keys, rows };
+  return { keys: isArray ? undefined : keys, rows };
 }
 
 function buildKeyValues(input: FieldValues[] | FieldValues | (FieldValues | unknown[])[]) {
@@ -562,7 +546,7 @@ function buildKeyValues(input: FieldValues[] | FieldValues | (FieldValues | unkn
 export function buildKeys(fvs: FieldValues[] | FieldValues): QueryFragments {
   const { fields } = buildKeyValues(fvs);
   if (!fields) {
-    throw new Error('buildKeys: FieldValues must be objects');
+    throw new Error('buildKeys requires FieldValues to be objects.');
   }
   return fields;
 }
@@ -574,7 +558,7 @@ export function buildValues(fvs: (FieldValues | unknown[])[]) {
 export function buildInsert(table: string, fvs: FieldValues[] | FieldValues, appendix?: string | QueryFragment) {
   const { fields, VALUES } = buildKeyValues(fvs);
   if (!fields) {
-    throw new Error('buildInsert: FieldValues must be objects');
+    throw new Error('buildInsert requires FieldValues to be objects.');
   }
 
   return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES}`.append(appendix).join(' ');
@@ -605,18 +589,21 @@ export function buildUpsert(
 ) {
   const { keys, fields, VALUES } = buildKeyValues(fvs);
   if (!keys || !fields) {
-    throw new Error('buildUpsert: FieldValues must be objects');
+    throw new Error('buildUpsert requires FieldValues to be objects.');
   }
 
   const ON_CONFLICT = sql(...onConflictKeys.map(makeIdent)).setSewingPattern('ON CONFLICT (', ', ', ')');
   const mutableKeys = keys.filter((x) => !onConflictKeys.includes(x));
 
-  const CONFLICT_ACTION =
+  const DO_ACTION =
     mutableKeys.length === 0
       ? sql`DO NOTHING`
-      : sql(...mutableKeys.map((k) => sql`${ident(k)} = EXCLUDED.${ident(k)}`)).setSewingPattern('DO UPDATE SET ', ', ');
+      : sql(...mutableKeys.map((k) => sql`${ident(k)} = EXCLUDED.${ident(k)}`)).setSewingPattern(
+          'DO UPDATE SET ',
+          ', ',
+        );
 
-  return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES} ${ON_CONFLICT} ${CONFLICT_ACTION}`
+  return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES} ${ON_CONFLICT} ${DO_ACTION}`
     .append(appendix)
     .join(' ');
 }

@@ -71,7 +71,7 @@ export class QueryHelper<X extends object = object> {
     // set query function
     if (!this.#opts.query) {
       if (!('query' in db) || typeof db.query !== 'function') {
-        throw new Error('Invalid or no query functionn is specified');
+        throw new Error('No valid query function provided.');
       }
 
       this.#opts.query = db.query as QueryableFunction<X>;
@@ -95,7 +95,7 @@ export class QueryHelper<X extends object = object> {
 
   #exec(query: QueryConfig) {
     const queryFn = this.#opts.query;
-    if (!queryFn) throw new Error('Missing query function');
+    if (!queryFn) throw new Error('Query function is not configured.');
     return queryFn.call(this.#db, query);
   }
 
@@ -297,7 +297,7 @@ export class QueryHelper<X extends object = object> {
           rowCount: rows.length,
         };
       }
-      throw new Error('Invalid object');
+      throw new Error('Prisma adapter requires a $queryRawUnsafe function.');
     };
   }
 
@@ -322,7 +322,7 @@ export class QueryHelper<X extends object = object> {
           rowCount: rows.length,
         } as { rows: T[]; rowCount: number };
       }
-      throw new Error('Invalid object');
+      throw new Error('TypeORM adapter requires a query function.');
     };
   }
 
@@ -334,7 +334,7 @@ export class QueryHelper<X extends object = object> {
 
         return { rows, rowCount: rows.length };
       }
-      throw new Error('Invalid object');
+      throw new Error('SQLite adapter requires a prepare function.');
     };
   }
 }

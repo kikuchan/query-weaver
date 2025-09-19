@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { buildInsert, buildUpsert, json, OR, sql, WHERE, withQueryHelper, type QueryResult } from '../src';
+import {
+  buildInsert,
+  buildKeys,
+  buildUpsert,
+  buildValues,
+  json,
+  OR,
+  sql,
+  WHERE,
+  withQueryHelper,
+  type QueryResult,
+} from '../src';
 
 const queryable = {
   executed: [] as { text: string; values?: unknown[] }[],
@@ -98,6 +109,35 @@ describe('builders', () => {
 
     expect(q.text).toBe('INSERT INTO users (id) VALUES ($1) ON CONFLICT (id) DO NOTHING');
     expect(q.values).toEqual([1]);
+  });
+
+  it('throws when array rows lead to mismatched column counts', () => {
+    expect(() =>
+      buildValues([
+        [1, undefined],
+        [2, 3],
+      ]),
+    ).toThrowError();
+  });
+
+  it('throws when insert field values array is empty', () => {
+    expect(() => buildInsert('users', [])).toThrowError('At least one field value is required.');
+  });
+
+  it('throws when insert field values are neither objects nor arrays', () => {
+    expect(() => buildInsert('users', 1 as unknown as Record<string, unknown>)).toThrowError(
+      'Field values must be arrays or plain objects.',
+    );
+  });
+
+  it('throws when insert field values mix objects and arrays', () => {
+    expect(() => buildInsert('users', [{ id: 1 }, [1]])).toThrowError('All entries must share the same structure.');
+  });
+
+  it('throws when buildKeys receives array-based field values', () => {
+    expect(() => buildKeys([[1]] as unknown as Record<string, unknown>[])).toThrowError(
+      'buildKeys requires FieldValues to be objects.',
+    );
   });
 });
 
