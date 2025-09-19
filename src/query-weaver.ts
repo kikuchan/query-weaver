@@ -485,48 +485,92 @@ export function OFFSET(offset: number | string | null | undefined) {
   return offset >= 0 ? sql`OFFSET ${offset}` : sql``;
 }
 
+type ExtractedFieldRows = { keys?: string[]; rows: unknown[][] };
+
+function extractFieldRows(input: FieldValues[] | FieldValues | (FieldValues | unknown[])[]): ExtractedFieldRows {
+  const list = (Array.isArray(input) ? input : [input]) as (FieldValues | unknown[])[];
+  if (list.length === 0) {
+    throw new Error('Invalid call of the function');
+  }
+
+  const first = list[0];
+
+  if (Array.isArray(first)) {
+    const rows = list.map((row) => {
+      if (!Array.isArray(row)) {
+        throw new Error('All rows must be arrays');
+      }
+      return row;
+    });
+    const sig = rows[0]?.length ?? 0;
+    if (rows.some((row) => row.length !== sig)) {
+      throw new Error('All arrays must have the same length');
+    }
+    return { rows };
+  }
+
+  if (!first || typeof first !== 'object') {
+    throw new Error('Invalid call of the function');
+  }
+
+  const normalizedObjects = list.map((fv) => {
+    if (!fv || typeof fv !== 'object' || Array.isArray(fv)) {
+      throw new Error('Invalid call of the function');
+    }
+    return Object.fromEntries(Object.entries(fv).filter(([, v]) => v !== undefined)) as FieldValues;
+  });
+
+  const keys = Object.keys(normalizedObjects[0]);
+
+  const rows = normalizedObjects.map((row) => {
+    const rowKeys = Object.keys(row);
+    if (rowKeys.length !== keys.length) {
+      throw new Error('All objects must have the same keys');
+    }
+
+    const values = keys.map((key) => {
+      if (!Object.prototype.hasOwnProperty.call(row, key)) {
+        throw new Error('All objects must have the same keys');
+      }
+      return row[key];
+    });
+
+    return values;
+  });
+
+  const sig = rows[0]?.length ?? 0;
+  if (rows.some((row) => row.length !== sig)) {
+    throw new Error('All arrays must have the same length');
+  }
+
+  return { keys, rows };
+}
+
+function buildKeyValues(input: FieldValues[] | FieldValues | (FieldValues | unknown[])[]) {
+  const { keys, rows } = extractFieldRows(input);
+  const fields = keys ? sql(...keys.map(makeIdent)).setSewingPattern('(', ', ', ')') : undefined;
+  const values = sql(...rows.map((v) => sql(...v).join(', '))).setSewingPattern('(', '), (', ')');
+
+  return { keys, fields, VALUES: sql`VALUES ${values}` };
+}
+
+export function buildKeys(fvs: FieldValues[] | FieldValues): QueryFragments {
+  const { fields } = buildKeyValues(fvs);
+  if (!fields) {
+    throw new Error('buildKeys: FieldValues must be objects');
+  }
+  return fields;
+}
+
 export function buildValues(fvs: (FieldValues | unknown[])[]) {
-  if (!Array.isArray(fvs)) {
-    if (typeof fvs !== 'object') throw new Error('buildValues: The argument must be an array');
-    fvs = [fvs];
-  }
-  if (fvs.length === 0) throw new Error('buildValues: Array must contain elements at least one');
-
-  const array = fvs.map((x) => (typeof x === 'object' ? Object.values(x) : x));
-
-  const sig = array[0].length;
-  if (array.some((arg) => arg.length !== sig)) {
-    throw new Error('buildValues: Array must all be the same length');
-  }
-
-  const values = sql(...array.map((v) => sql(...v).join(', '))).setSewingPattern('(', '), (', ')');
-  return sql`VALUES ${values}`;
-}
-
-function fvsKeys(fvs: FieldValues[] | FieldValues) {
-  if (!Array.isArray(fvs)) fvs = [fvs];
-  if (fvs.length == 0 || !fvs[0] || typeof fvs[0] !== 'object') throw new Error('Invalid call of the function');
-
-  fvs = fvs.map((fv) => Object.fromEntries(Object.entries(fv).filter(([_, v]) => v !== undefined)));
-
-  const ks = Object.keys(fvs[0]);
-  const sig = ks.join();
-  if (fvs.some((fv) => Object.keys(fv).join() !== sig)) {
-    throw new Error('All objects must have the same keys');
-  }
-
-  return ks;
-}
-
-export function buildKeys(fvs: FieldValues[] | FieldValues) {
-  return sql(...fvsKeys(fvs).map(makeIdent)).setSewingPattern('(', ', ', ')');
+  return buildKeyValues(fvs).VALUES;
 }
 
 export function buildInsert(table: string, fvs: FieldValues[] | FieldValues, appendix?: string | QueryFragment) {
-  if (!Array.isArray(fvs)) fvs = [fvs];
-
-  const fields = buildKeys(fvs);
-  const VALUES = buildValues(fvs.map(Object.values));
+  const { fields, VALUES } = buildKeyValues(fvs);
+  if (!fields) {
+    throw new Error('buildInsert: FieldValues must be objects');
+  }
 
   return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES}`.append(appendix).join(' ');
 }
@@ -554,17 +598,15 @@ export function buildUpsert(
   onConflictKeys: string[],
   appendix?: string | QueryFragment,
 ) {
-  if (!Array.isArray(fvs)) fvs = [fvs];
-
-  const fields = buildKeys(fvs);
-  const VALUES = buildValues(fvs.map(Object.values));
+  const { keys, fields, VALUES } = buildKeyValues(fvs);
+  if (!keys || !fields) {
+    throw new Error('buildUpsert: FieldValues must be objects');
+  }
 
   const ON_CONFLICT = sql(...onConflictKeys.map(makeIdent)).setSewingPattern('ON CONFLICT (', ', ', ')');
 
   const DO_UPDATE_SET = sql(
-    ...fvsKeys(fvs)
-      .filter((x) => !onConflictKeys.includes(x))
-      .map((k) => sql`${ident(k)} = EXCLUDED.${ident(k)}`),
+    ...keys.filter((x) => !onConflictKeys.includes(x)).map((k) => sql`${ident(k)} = EXCLUDED.${ident(k)}`),
   ).setSewingPattern('DO UPDATE SET ', ', ');
 
   return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES} ${ON_CONFLICT} ${DO_UPDATE_SET}`
