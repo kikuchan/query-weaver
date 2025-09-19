@@ -259,23 +259,31 @@ export class QueryHelper<X extends object = object> {
    *   });
    */
   async begin<R>(callback: (conn: this) => Promise<R>) {
-    try {
-      if (!this.#inTransaction++) {
-        await this.#exec({ text: 'BEGIN', values: [] });
-      }
+    if (this.#inTransaction === 0) {
+      await this.#exec({ text: 'BEGIN', values: [] });
+    }
 
+    this.#inTransaction += 1;
+
+    try {
       const result = await callback(this);
 
-      if (!--this.#inTransaction) {
+      if (this.#inTransaction === 1) {
         await this.#exec({ text: 'COMMIT', values: [] });
       }
 
       return result;
-    } catch (e) {
-      if (!--this.#inTransaction) {
-        await this.#exec({ text: 'ROLLBACK', values: [] });
+    } catch (error) {
+      if (this.#inTransaction === 1) {
+        try {
+          await this.#exec({ text: 'ROLLBACK', values: [] });
+        } catch (rollbackError) {
+          throw new AggregateError([error, rollbackError], 'Unable to rollback transaction');
+        }
       }
-      throw e;
+      throw error;
+    } finally {
+      this.#inTransaction -= 1;
     }
   }
 
