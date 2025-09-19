@@ -28,7 +28,7 @@ export function pgString(s: unknown, _ctx?: Context): string {
   if (Array.isArray(s)) return 'ARRAY[' + s.map((e) => pgString(e)).join(',') + ']';
   if (typeof s === 'object') {
     if ('toJSON' in s && typeof s.toJSON === 'function') {
-      return quoteLiteral(s.toJSON());
+      return quoteLiteral(String(s.toJSON()));
     }
     return quoteLiteral(s.toString());
   }
@@ -481,7 +481,7 @@ export function UNION(...fv: unknown[]) {
 export function LIMIT(limit: number | string | null | undefined) {
   if (limit == null) return sql``;
   limit = Number(limit);
-  return limit > 0 ? sql`LIMIT ${limit}` : sql``;
+  return limit >= 0 ? sql`LIMIT ${limit}` : sql``;
 }
 
 export function OFFSET(offset: number | string | null | undefined) {
