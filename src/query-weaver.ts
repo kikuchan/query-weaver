@@ -593,6 +593,10 @@ export function buildUpsert(
   onConflictKeys: string[],
   appendix?: string | QueryFragment,
 ) {
+  if (!onConflictKeys.length) {
+    throw new Error('buildUpsert requires at least one conflict key.');
+  }
+
   const { keys, fields, VALUES } = buildKeyValues(fvs);
   if (!keys || !fields) {
     throw new Error('buildUpsert requires FieldValues to be objects.');

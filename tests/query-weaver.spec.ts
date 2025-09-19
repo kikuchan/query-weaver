@@ -147,6 +147,10 @@ describe('builders', () => {
       'buildUpdate requires at least one field to update.',
     );
   });
+
+  it('throws when upsert receives no conflict keys', () => {
+    expect(() => buildUpsert('users', { id: 1 }, [])).toThrowError('buildUpsert requires at least one conflict key.');
+  });
 });
 
 describe('comment and quote handling', () => {
