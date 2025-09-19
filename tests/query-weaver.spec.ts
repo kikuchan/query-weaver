@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { buildInsert, json, OR, sql, WHERE, withQueryHelper, type QueryResult } from '../src';
+import { buildInsert, buildUpsert, json, OR, sql, WHERE, withQueryHelper, type QueryResult } from '../src';
 
 const queryable = {
   executed: [] as { text: string; values?: unknown[] }[],
@@ -77,6 +77,13 @@ describe('WHERE builder', () => {
       "SELECT * FROM foobar WHERE ((a = '10') AND (b = 'string') AND (c IS UNKNOWN) AND (d BETWEEN '1' AND '5') AND (e IS NULL) AND (f = ANY (ARRAY['1','2','3','4','5'])))",
     );
   });
+
+  it('treats empty arrays as FALSE clauses', () => {
+    const clause = WHERE({ tags: [] });
+
+    expect(clause.text).toBe('WHERE ((FALSE))');
+    expect(clause.values).toEqual([]);
+  });
 });
 
 describe('builders', () => {
@@ -84,6 +91,13 @@ describe('builders', () => {
     const q = buildInsert('test', { a: undefined, b: 10, c: '20' });
     expect(q.text).toBe('INSERT INTO test (b, c) VALUES ($1, $2)');
     expect(q.embed).toBe("INSERT INTO test (b, c) VALUES ('10', '20')");
+  });
+
+  it('generates DO NOTHING when upsert has no update targets', () => {
+    const q = buildUpsert('users', { id: 1 }, ['id']);
+
+    expect(q.text).toBe('INSERT INTO users (id) VALUES ($1) ON CONFLICT (id) DO NOTHING');
+    expect(q.values).toEqual([1]);
   });
 });
 

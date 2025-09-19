@@ -434,7 +434,12 @@ export function buildClauses(...args: WhereArg[]) {
         }
 
         if (Array.isArray(val[key])) {
-          clauses.push(sql`${makeIdent(key)} = ANY (${val[key]})`);
+          const arrayValues = val[key] as unknown[];
+          if (arrayValues.length === 0) {
+            clauses.push(sql`FALSE`);
+            continue;
+          }
+          clauses.push(sql`${makeIdent(key)} = ANY (${arrayValues})`);
           continue;
         }
 
@@ -604,12 +609,14 @@ export function buildUpsert(
   }
 
   const ON_CONFLICT = sql(...onConflictKeys.map(makeIdent)).setSewingPattern('ON CONFLICT (', ', ', ')');
+  const mutableKeys = keys.filter((x) => !onConflictKeys.includes(x));
 
-  const DO_UPDATE_SET = sql(
-    ...keys.filter((x) => !onConflictKeys.includes(x)).map((k) => sql`${ident(k)} = EXCLUDED.${ident(k)}`),
-  ).setSewingPattern('DO UPDATE SET ', ', ');
+  const CONFLICT_ACTION =
+    mutableKeys.length === 0
+      ? sql`DO NOTHING`
+      : sql(...mutableKeys.map((k) => sql`${ident(k)} = EXCLUDED.${ident(k)}`)).setSewingPattern('DO UPDATE SET ', ', ');
 
-  return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES} ${ON_CONFLICT} ${DO_UPDATE_SET}`
+  return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES} ${ON_CONFLICT} ${CONFLICT_ACTION}`
     .append(appendix)
     .join(' ');
 }
