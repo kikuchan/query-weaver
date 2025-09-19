@@ -40,9 +40,9 @@ type pgQueryResult<X, T extends QueryResultRow> = (X extends {
   : QueryResult<T>) & { rowCount: number };
 
 export type QueryHelperOptions = {
-  beforeQuery?: <T extends QueryConfig>(ctx: T) => void;
-  afterQuery?: <T extends QueryConfig, R extends QueryResultRow>(ctx: T, r: QueryResult<R>) => void;
-  onError?: <T extends QueryConfig>(ctx: T, e: unknown) => void;
+  beforeQuery?: (ctx: Readonly<QueryConfig>) => void;
+  afterQuery?: <R extends QueryResultRow>(ctx: Readonly<QueryConfig>, r: QueryResult<R>) => void;
+  onError?: (ctx: Readonly<QueryConfig>, e: unknown) => void;
 };
 
 type QueryTemplateOrSimpleQuery =
@@ -102,10 +102,10 @@ export class QueryHelper<X extends object = object> {
   async #query<T extends QueryResultRow>(args: QueryTemplateOrSimpleQuery): Promise<pgQueryResult<X, T>> {
     const query = this.#parseQueryTemplateStyle(args);
 
-    this.#opts?.beforeQuery?.(query);
+    this.#opts?.beforeQuery?.(query as Readonly<QueryConfig>);
 
     const results = await this.#exec(query).catch((e: unknown) => {
-      this.#opts?.onError?.(query, e);
+      this.#opts?.onError?.(query as Readonly<QueryConfig>, e);
       throw e;
     });
 
@@ -113,7 +113,7 @@ export class QueryHelper<X extends object = object> {
       results.rowCount = results.rows?.length ?? 0;
     }
 
-    this.#opts?.afterQuery?.(query, pick(results, ['command', 'rowCount', 'rows']));
+    this.#opts?.afterQuery?.(query as Readonly<QueryConfig>, pick(results, ['command', 'rowCount', 'rows']));
 
     return results as pgQueryResult<X, T>;
   }
