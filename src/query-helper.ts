@@ -378,7 +378,8 @@ export function withQueryHelper<T extends object>(
 
       if (value && value instanceof Function) {
         return function (this: unknown, ...args: unknown[]) {
-          const result = value.apply(this === receiver ? target : this, args);
+          const invocationTarget = this === receiver || this === proxy || this == null ? target : this;
+          const result = value.apply(invocationTarget, args);
           return result === db ? proxy : result;
         };
       }

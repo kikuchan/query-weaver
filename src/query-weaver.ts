@@ -566,12 +566,18 @@ export function buildInsert(table: string, fvs: FieldValues[] | FieldValues, app
 
 export function buildUpdate(table: string, fv: FieldValues, where?: WhereArg, appendix?: string | QueryFragment) {
   const pairs = new QueryFragments();
+  let hasAssignments = false;
 
   for (const k in fv) {
     const val = fv[k];
     if (val === undefined) continue;
 
     pairs.push(sql`${makeIdent(k)} = ${val}`);
+    hasAssignments = true;
+  }
+
+  if (!hasAssignments) {
+    throw new Error('buildUpdate requires at least one field to update.');
   }
 
   return sql`UPDATE ${makeIdent(table)} SET ${pairs.join(', ')} ${WHERE(where)}`.append(appendix).join(' ');

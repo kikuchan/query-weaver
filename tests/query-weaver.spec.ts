@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   buildInsert,
   buildKeys,
+  buildUpdate,
   buildUpsert,
   buildValues,
   json,
@@ -137,6 +138,13 @@ describe('builders', () => {
   it('throws when buildKeys receives array-based field values', () => {
     expect(() => buildKeys([[1]] as unknown as Record<string, unknown>[])).toThrowError(
       'buildKeys requires FieldValues to be objects.',
+    );
+  });
+
+  it('throws when update receives no columns to mutate', () => {
+    expect(() => buildUpdate('users', {})).toThrowError('buildUpdate requires at least one field to update.');
+    expect(() => buildUpdate('users', { id: undefined }, { id: 1 })).toThrowError(
+      'buildUpdate requires at least one field to update.',
     );
   });
 });
