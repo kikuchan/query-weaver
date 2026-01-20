@@ -7,6 +7,8 @@ const projectRoot = import.meta.dirname;
 const outDir = path.join(projectRoot, 'dist');
 
 export default defineConfig({
+  format: ['esm', 'cjs'],
+  fixedExtension: false,
   minify: true,
   dts: true,
   outDir,
