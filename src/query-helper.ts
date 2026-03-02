@@ -283,8 +283,10 @@ export class QueryHelper<X extends object = object> {
       if (this.#inTransaction === 1) {
         try {
           await this.#exec({ text: 'ROLLBACK', values: [] });
-        } catch (rollbackError) {
-          throw new AggregateError([error, rollbackError], 'Unable to rollback transaction');
+        } catch {
+          throw new Error('Rollback error', {
+            cause: error,
+          });
         }
       }
       throw error;
