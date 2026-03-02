@@ -87,7 +87,13 @@ export class QueryHelper<X extends object = object> {
     const [query, values] = args;
 
     if (typeof query === 'object' && query && 'text' in query) {
-      return { ...query, values: query.values ?? [] };
+      return {
+        text: query.text,
+        values: query.values || [],
+        embed: 'embed' in query && typeof query.embed === 'string' ? query.embed : undefined,
+        sql: 'sql' in query && typeof query.sql === 'string' ? query.sql : undefined,
+        statement: 'statement' in query && typeof query.statement === 'string' ? query.statement : undefined,
+      };
     }
 
     return { text: query, values: values ?? [] };
