@@ -1,6 +1,6 @@
 {
   "name": "query-weaver",
-  "version": "0.2.0-alpha.3",
+  "version": "0.2.0-alpha.4",
   "description": "SQL query builder using template string literal",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
