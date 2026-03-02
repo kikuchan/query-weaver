@@ -27,6 +27,9 @@
   },
   "author": "kikuchan98@gmail.com",
   "homepage": "https://github.com/kikuchan/query-weaver#readme",
+  "repository": {
+    "url": "https://github.com/kikuchan/query-weaver"
+  },
   "license": "MIT",
   "devDependencies": {
     "@eslint/compat": "^2.0.2",
