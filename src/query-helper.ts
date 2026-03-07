@@ -1,6 +1,23 @@
 import type pg from 'pg';
-import type { FieldValues, QueryFragment, QueryTemplateStyle, WhereArg } from './query-weaver.ts';
-import { buildDelete, buildInsert, buildUpdate, buildUpsert, isQueryTemplateStyle, sql } from './query-weaver.ts';
+import type {
+  DeleteOptions,
+  FieldValues,
+  QueryFragment,
+  QueryTemplateStyle,
+  UpdateOptions,
+  WhereArg,
+} from './query-weaver.ts';
+import {
+  DELETE_ALL_WITHOUT_FORCE_ERROR,
+  UPDATE_ALL_WITHOUT_FORCE_ERROR,
+  buildDelete,
+  buildInsert,
+  buildUpdate,
+  buildUpsert,
+  isQueryTemplateStyle,
+  isWhereEmpty,
+  sql,
+} from './query-weaver.ts';
 
 export type QueryResultRow = pg.QueryResultRow;
 
@@ -153,8 +170,13 @@ export class QueryHelper<X extends object = object> {
     fv: FieldValues,
     where: WhereArg,
     appendix?: string | QueryFragment,
+    opts: UpdateOptions = {},
   ) {
-    const query = buildUpdate(table, fv, where, appendix);
+    if (!opts.force && isWhereEmpty(where)) {
+      throw new Error(UPDATE_ALL_WITHOUT_FORCE_ERROR);
+    }
+
+    const query = buildUpdate(table, fv, where, appendix, opts);
     return await this.#query<T>([query]);
   }
 
@@ -164,8 +186,17 @@ export class QueryHelper<X extends object = object> {
    * @example
    *   await db.delete('table', { id: 'root' }, 'RETURNING *');
    */
-  async delete<T extends QueryResultRow>(table: string, where: WhereArg, appendix?: string | QueryFragment) {
-    const query = buildDelete(table, where, appendix);
+  async delete<T extends QueryResultRow>(
+    table: string,
+    where: WhereArg,
+    appendix?: string | QueryFragment,
+    opts: DeleteOptions = {},
+  ): Promise<QueryResult<T>> {
+    if (!opts.force && isWhereEmpty(where)) {
+      throw new Error(DELETE_ALL_WITHOUT_FORCE_ERROR);
+    }
+
+    const query = buildDelete(table, where, appendix, opts);
     return await this.#query<T>([query]);
   }
 
