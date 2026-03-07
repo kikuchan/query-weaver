@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  buildDelete,
   buildInsert,
   buildKeys,
   buildUpdate,
   buildUpsert,
   buildValues,
+  DELETE_ALL_WITHOUT_FORCE_ERROR,
+  isWhereEmpty,
   json,
   OR,
   sql,
+  UPDATE_ALL_WITHOUT_FORCE_ERROR,
   WHERE,
   withQueryHelper,
   type QueryResult,
@@ -148,6 +152,24 @@ describe('builders', () => {
     );
   });
 
+  it('throws on UPDATE generation when WHERE is empty', () => {
+    expect(() => buildUpdate('users', { name: 'a' }, {})).toThrowError(UPDATE_ALL_WITHOUT_FORCE_ERROR);
+    expect(() => buildUpdate('users', { name: 'a' }, { id: undefined })).toThrowError(UPDATE_ALL_WITHOUT_FORCE_ERROR);
+  });
+
+  it('detects empty WHERE conditions after undefined values are removed', () => {
+    expect(isWhereEmpty()).toBe(true);
+    expect(isWhereEmpty({})).toBe(true);
+    expect(isWhereEmpty({ id: undefined })).toBe(true);
+    expect(isWhereEmpty({ id: 1 })).toBe(false);
+    expect(isWhereEmpty({ tags: [] })).toBe(false);
+  });
+
+  it('throws on DELETE generation when WHERE is empty', () => {
+    expect(() => buildDelete('users', {})).toThrowError(DELETE_ALL_WITHOUT_FORCE_ERROR);
+    expect(() => buildDelete('users', { id: undefined })).toThrowError(DELETE_ALL_WITHOUT_FORCE_ERROR);
+  });
+
   it('throws when upsert receives no conflict keys', () => {
     expect(() => buildUpsert('users', { id: 1 }, [])).toThrowError('buildUpsert requires at least one conflict key.');
   });
@@ -231,5 +253,21 @@ describe('transactions', () => {
       { text: 'DUMMY2', values: [] },
       { text: 'ROLLBACK', values: [] },
     ]);
+  });
+});
+
+describe('delete safety', () => {
+  it('throws when DELETE would run without a WHERE condition', async () => {
+    await expect(db.delete('users', { id: undefined })).rejects.toThrowError(DELETE_ALL_WITHOUT_FORCE_ERROR);
+    expect(db.executed).toStrictEqual([]);
+  });
+});
+
+describe('update safety', () => {
+  it('throws when UPDATE would run without a WHERE condition', async () => {
+    await expect(db.update('users', { name: 'a' }, { id: undefined })).rejects.toThrowError(
+      UPDATE_ALL_WITHOUT_FORCE_ERROR,
+    );
+    expect(db.executed).toStrictEqual([]);
   });
 });

@@ -13,6 +13,9 @@ type EscapeFunction = (v: unknown, context?: Context) => string;
 export type FieldValues = Record<string, unknown>;
 export type WhereArg = string | FieldValues | QueryFragment | undefined | WhereArg[];
 
+export const DELETE_ALL_WITHOUT_FORCE_ERROR = 'DELETE requires a non-empty WHERE condition.';
+export const UPDATE_ALL_WITHOUT_FORCE_ERROR = 'UPDATE requires a non-empty WHERE condition.';
+
 export function pgIdent(s: string, _ctx?: Context) {
   // '.' is a special for us
   return s
@@ -466,6 +469,10 @@ export function WHERE(...fv: WhereArg[]) {
   return buildClauses(fv).setSewingPattern('WHERE ((', ') AND (', '))', '');
 }
 
+export function isWhereEmpty(...fv: WhereArg[]) {
+  return buildClauses(fv).text.length === 0;
+}
+
 export function WHERE_OR(...fv: WhereArg[]) {
   return buildClauses(fv).setSewingPattern('WHERE ((', ') OR (', '))', '');
 }
@@ -580,10 +587,18 @@ export function buildUpdate(table: string, fv: FieldValues, where?: WhereArg, ap
     throw new Error('buildUpdate requires at least one field to update.');
   }
 
+  if (isWhereEmpty(where)) {
+    throw new Error(UPDATE_ALL_WITHOUT_FORCE_ERROR);
+  }
+
   return sql`UPDATE ${makeIdent(table)} SET ${pairs.join(', ')} ${WHERE(where)}`.append(appendix).join(' ');
 }
 
 export function buildDelete(table: string, where?: WhereArg, appendix?: string | QueryFragment) {
+  if (isWhereEmpty(where)) {
+    throw new Error(DELETE_ALL_WITHOUT_FORCE_ERROR);
+  }
+
   return sql`DELETE FROM ${makeIdent(table)} ${WHERE(where)}`.append(appendix).join(' ');
 }
 
