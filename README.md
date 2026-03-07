@@ -160,6 +160,9 @@ db.insert(tableName, [{ ...fieldValuePairs }, ...]);  // => db.query`INSERT INTO
 ```js
 sql.update(tableName, { ...fieldValuePairs }, { ...whereCondition }); // => sql`UPDATE ...`
 db.update(tableName, { ...fieldValuePairs }, { ...whereCondition });  // => db.query`UPDATE ...`
+
+// Empty conditions throw for safety.
+db.update(tableName, { name: 'updated' }, { id: undefined });
 ```
 
 ### DELETE Builder and Helper
@@ -169,6 +172,9 @@ db.update(tableName, { ...fieldValuePairs }, { ...whereCondition });  // => db.q
 ```js
 sql.delete(tableName, { ...whereCondition }); // => sql`DELETE FROM ...`
 db.delete(tableName, { ...whereCondition });  // => db.query`DELETE FROM ...`
+
+// Empty conditions throw for safety.
+db.delete(tableName, { id: undefined });
 ```
 
 ### Transaction Helper

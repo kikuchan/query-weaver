@@ -1,6 +1,16 @@
 import type pg from 'pg';
 import type { FieldValues, QueryFragment, QueryTemplateStyle, WhereArg } from './query-weaver.ts';
-import { buildDelete, buildInsert, buildUpdate, buildUpsert, isQueryTemplateStyle, sql } from './query-weaver.ts';
+import {
+  DELETE_ALL_WITHOUT_FORCE_ERROR,
+  UPDATE_ALL_WITHOUT_FORCE_ERROR,
+  buildDelete,
+  buildInsert,
+  buildUpdate,
+  buildUpsert,
+  isQueryTemplateStyle,
+  isWhereEmpty,
+  sql,
+} from './query-weaver.ts';
 
 export type QueryResultRow = pg.QueryResultRow;
 
@@ -154,6 +164,10 @@ export class QueryHelper<X extends object = object> {
     where: WhereArg,
     appendix?: string | QueryFragment,
   ) {
+    if (isWhereEmpty(where)) {
+      throw new Error(UPDATE_ALL_WITHOUT_FORCE_ERROR);
+    }
+
     const query = buildUpdate(table, fv, where, appendix);
     return await this.#query<T>([query]);
   }
@@ -164,7 +178,15 @@ export class QueryHelper<X extends object = object> {
    * @example
    *   await db.delete('table', { id: 'root' }, 'RETURNING *');
    */
-  async delete<T extends QueryResultRow>(table: string, where: WhereArg, appendix?: string | QueryFragment) {
+  async delete<T extends QueryResultRow>(
+    table: string,
+    where: WhereArg,
+    appendix?: string | QueryFragment,
+  ): Promise<QueryResult<T>> {
+    if (isWhereEmpty(where)) {
+      throw new Error(DELETE_ALL_WITHOUT_FORCE_ERROR);
+    }
+
     const query = buildDelete(table, where, appendix);
     return await this.#query<T>([query]);
   }
