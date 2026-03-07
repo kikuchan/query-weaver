@@ -12,6 +12,15 @@ type Context = {
 type EscapeFunction = (v: unknown, context?: Context) => string;
 export type FieldValues = Record<string, unknown>;
 export type WhereArg = string | FieldValues | QueryFragment | undefined | WhereArg[];
+export type DeleteOptions = {
+  force?: boolean;
+};
+export type UpdateOptions = {
+  force?: boolean;
+};
+
+export const DELETE_ALL_WITHOUT_FORCE_ERROR = 'DELETE requires a non-empty WHERE condition unless force is true.';
+export const UPDATE_ALL_WITHOUT_FORCE_ERROR = 'UPDATE requires a non-empty WHERE condition unless force is true.';
 
 export function pgIdent(s: string, _ctx?: Context) {
   // '.' is a special for us
@@ -466,6 +475,10 @@ export function WHERE(...fv: WhereArg[]) {
   return buildClauses(fv).setSewingPattern('WHERE ((', ') AND (', '))', '');
 }
 
+export function isWhereEmpty(...fv: WhereArg[]) {
+  return buildClauses(fv).text.length === 0;
+}
+
 export function WHERE_OR(...fv: WhereArg[]) {
   return buildClauses(fv).setSewingPattern('WHERE ((', ') OR (', '))', '');
 }
@@ -564,7 +577,13 @@ export function buildInsert(table: string, fvs: FieldValues[] | FieldValues, app
   return sql`INSERT INTO ${makeIdent(table)} ${fields} ${VALUES}`.append(appendix).join(' ');
 }
 
-export function buildUpdate(table: string, fv: FieldValues, where?: WhereArg, appendix?: string | QueryFragment) {
+export function buildUpdate(
+  table: string,
+  fv: FieldValues,
+  where?: WhereArg,
+  appendix?: string | QueryFragment,
+  opts: UpdateOptions = {},
+) {
   const pairs = new QueryFragments();
   let hasAssignments = false;
 
@@ -580,10 +599,31 @@ export function buildUpdate(table: string, fv: FieldValues, where?: WhereArg, ap
     throw new Error('buildUpdate requires at least one field to update.');
   }
 
+  if (!opts.force && isWhereEmpty(where)) {
+    throw new Error(UPDATE_ALL_WITHOUT_FORCE_ERROR);
+  }
+
+  if (opts.force && isWhereEmpty(where)) {
+    return sql`UPDATE ${makeIdent(table)} SET ${pairs.join(', ')}`.append(appendix).join(' ');
+  }
+
   return sql`UPDATE ${makeIdent(table)} SET ${pairs.join(', ')} ${WHERE(where)}`.append(appendix).join(' ');
 }
 
-export function buildDelete(table: string, where?: WhereArg, appendix?: string | QueryFragment) {
+export function buildDelete(
+  table: string,
+  where?: WhereArg,
+  appendix?: string | QueryFragment,
+  opts: DeleteOptions = {},
+) {
+  if (!opts.force && isWhereEmpty(where)) {
+    throw new Error(DELETE_ALL_WITHOUT_FORCE_ERROR);
+  }
+
+  if (opts.force && isWhereEmpty(where)) {
+    return sql`DELETE FROM ${makeIdent(table)}`.append(appendix).join(' ');
+  }
+
   return sql`DELETE FROM ${makeIdent(table)} ${WHERE(where)}`.append(appendix).join(' ');
 }
 
