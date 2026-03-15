@@ -216,12 +216,12 @@ describe('comment and quote handling', () => {
 
 describe('transactions', () => {
   it('commits nested transactions', async () => {
-    await db.begin(async () => {
-      await db.query('DUMMY1');
-      await db.begin(async () => {
-        await db.query('DUMMY2');
+    await db.begin(async (conn) => {
+      await conn.query('DUMMY1');
+      await conn.begin(async (conn) => {
+        await conn.query('DUMMY2');
       });
-      await db.query('DUMMY3');
+      await conn.query('DUMMY3');
       return true;
     });
 
@@ -236,13 +236,13 @@ describe('transactions', () => {
 
   it('rolls back on error in nested transaction', async () => {
     await expect(
-      db.begin(async () => {
-        await db.query('DUMMY1');
-        await db.begin(async () => {
-          await db.query('DUMMY2');
+      db.begin(async (conn) => {
+        await conn.query('DUMMY1');
+        await conn.begin(async (conn) => {
+          await conn.query('DUMMY2');
           throw new Error('ERROR');
         });
-        await db.query('DUMMY3');
+        await conn.query('DUMMY3');
         return true;
       }),
     ).rejects.toThrowError();

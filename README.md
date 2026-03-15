@@ -146,11 +146,11 @@ console.log(JSON.stringify(sql`SELECT * FROM foobar WHERE ${raw("bar LIKE '%some
 
 ```js
 sql.insert(tableName, { ...fieldValuePairs }); // => sql`INSERT INTO ...`
-db.insert(tableName, { ...fieldValuePairs });  // => db.query`INSERT INTO ...`
+await db.insert(tableName, { ...fieldValuePairs });  // => db.query`INSERT INTO ...`
 
 // Bulk insert
 sql.insert(tableName, [{ ...fieldValuePairs }, ...]); // => sql`INSERT INTO ... VALUES (...), (...), ...`
-db.insert(tableName, [{ ...fieldValuePairs }, ...]);  // => db.query`INSERT INTO ... VALUES (...), (...), ...`
+await db.insert(tableName, [{ ...fieldValuePairs }, ...]);  // => db.query`INSERT INTO ... VALUES (...), (...), ...`
 ```
 
 ### UPDATE Builder and Helper
@@ -159,10 +159,10 @@ db.insert(tableName, [{ ...fieldValuePairs }, ...]);  // => db.query`INSERT INTO
 
 ```js
 sql.update(tableName, { ...fieldValuePairs }, { ...whereCondition }); // => sql`UPDATE ...`
-db.update(tableName, { ...fieldValuePairs }, { ...whereCondition });  // => db.query`UPDATE ...`
+await db.update(tableName, { ...fieldValuePairs }, { ...whereCondition });  // => db.query`UPDATE ...`
 
 // Empty conditions throw for safety.
-db.update(tableName, { name: 'updated' }, { id: undefined });
+await db.update(tableName, { name: 'updated' }, { id: undefined });
 ```
 
 ### DELETE Builder and Helper
@@ -171,10 +171,10 @@ db.update(tableName, { name: 'updated' }, { id: undefined });
 
 ```js
 sql.delete(tableName, { ...whereCondition }); // => sql`DELETE FROM ...`
-db.delete(tableName, { ...whereCondition });  // => db.query`DELETE FROM ...`
+await db.delete(tableName, { ...whereCondition });  // => db.query`DELETE FROM ...`
 
 // Empty conditions throw for safety.
-db.delete(tableName, { id: undefined });
+await db.delete(tableName, { id: undefined });
 ```
 
 ### Transaction Helper
@@ -182,14 +182,21 @@ db.delete(tableName, { id: undefined });
 `begin` helper
 
 ```js
-db.begin(() => {
-    db.delete(...);
-    db.insert(...);
+await db.begin(async (c) => {
+    await c.delete(...);
+    await c.insert(...);
+});
+
+await db.begin({
+    role: 'guest',
+}, async (c) => {
+    await c.delete(...);
+    await c.insert(...);
 });
 ```
 
 If an error occurs, the transaction is safely rolled back.
-**NOTE:** Transactions can be nested, but only the outermost transaction is effective.
+**NOTE:** `begin` can be nested, but only the outermost transaction is effective.
 
 ## Low-level APIs
 

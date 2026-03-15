@@ -9,7 +9,9 @@ const outDir = path.join(projectRoot, 'dist');
 export default defineConfig({
   format: ['esm', 'cjs'],
   fixedExtension: false,
-  noExternal: ['@kikuchan/string-reader'],
+  deps: {
+    onlyBundle: ['@kikuchan/string-reader'],
+  },
   minify: true,
   dts: true,
   outDir,

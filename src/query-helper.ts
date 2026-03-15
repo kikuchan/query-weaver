@@ -7,6 +7,7 @@ import {
   buildInsert,
   buildUpdate,
   buildUpsert,
+  ident,
   isQueryTemplateStyle,
   isWhereEmpty,
   sql,
@@ -49,10 +50,13 @@ type pgQueryResult<X, T extends QueryResultRow> = (X extends {
   ? pg.QueryResult<T>
   : QueryResult<T>) & { rowCount: number };
 
-export type QueryHelperOptions = {
+export type QueryHelperOptions<X extends object, Y extends object> = {
   beforeQuery?: (ctx: Readonly<QueryConfig>) => void;
   afterQuery?: <R extends QueryResultRow>(ctx: Readonly<QueryConfig>, r: QueryResult<R>) => void;
   onError?: (ctx: Readonly<QueryConfig>, e: unknown) => void;
+
+  connect?: (obj: X) => Promise<Y>;
+  release?: (conn: Y) => Promise<void> | void;
 };
 
 type QueryTemplateOrSimpleQuery =
@@ -66,25 +70,36 @@ function pick<T extends { [X in string]: T[X] }, K extends string>(target: T, ke
   };
 }
 
+export type QueryHelperBeginOption = {
+  transaction?: boolean;
+  role?: string;
+};
+
 /**
  * Query Helper
  */
-export class QueryHelper<X extends object = object> {
+export class QueryHelper<X extends object = object, Y extends object = object> {
   #db: X;
-  #opts: QueryHelperOptions & Partial<Queryable<X>>;
-  #inTransaction: number = 0;
 
-  constructor(db: X, opts: QueryHelperOptions & Partial<Queryable<X>> = {}) {
+  #opts: QueryHelperOptions<X, Y> & Partial<Queryable<X>>;
+  #nested: boolean;
+
+  constructor(db: X, opts: QueryHelperOptions<X, Y> & Partial<Queryable<X>> = {}, nested = false) {
     this.#db = db;
     this.#opts = { ...opts };
+    this.#nested = nested;
 
-    // set query function
-    if (!this.#opts.query) {
-      if (!('query' in db) || typeof db.query !== 'function') {
-        throw new Error('No valid query function provided.');
+    if (!this.#opts.connect && !this.#opts.release) {
+      if (
+        'connect' in this.#db &&
+        typeof this.#db.connect === 'function' &&
+        'totalCount' in this.#db &&
+        'idleCount' in this.#db
+      ) {
+        // XXX: heuristic: it looks like a pg.Pool instance
+        this.#opts.connect = () => (this.#db as { connect: () => Promise<Y> }).connect();
+        this.#opts.release = (y: Y) => (y as { release: () => void }).release();
       }
-
-      this.#opts.query = db.query as QueryableFunction<X>;
     }
   }
 
@@ -109,17 +124,16 @@ export class QueryHelper<X extends object = object> {
     return { text: query, values: values ?? [] };
   }
 
-  #exec(query: QueryConfig) {
-    const queryFn = this.#opts.query;
-    if (!queryFn) throw new Error('Query function is not configured.');
-    return queryFn.call(this.#db, query);
+  async #exec(query: QueryConfig) {
+    const queryFn = this.#opts.query ?? ('query' in this.#db && typeof this.#db.query === 'function' && this.#db.query);
+    if (!queryFn) throw new Error('Query function is not configured on the object.');
+    return await queryFn.call(this.#db, query);
   }
 
   async #query<T extends QueryResultRow>(args: QueryTemplateOrSimpleQuery): Promise<pgQueryResult<X, T>> {
     const query = this.#parseQueryTemplateStyle(args);
 
     this.#opts?.beforeQuery?.(query as Readonly<QueryConfig>);
-
     const results = await this.#exec(query).catch((e: unknown) => {
       this.#opts?.onError?.(query as Readonly<QueryConfig>, e);
       throw e;
@@ -276,6 +290,44 @@ export class QueryHelper<X extends object = object> {
     return this.#query(args).then((x) => x.rowCount);
   }
 
+  async #begin(opts: QueryHelperBeginOption) {
+    if (this.#nested) return this as unknown as QueryHelper<Y, Y>;
+
+    const conn = new QueryHelper<Y, Y>(
+      (await this.#opts.connect?.(this.#db)) ?? (this.#db as unknown as Y),
+      this.#opts as QueryHelperOptions<Y, Y> & Partial<Queryable<Y>>,
+      true,
+    );
+
+    if (opts.role) {
+      await conn.#exec(this.#parseQueryTemplateStyle([sql`SET ROLE ${ident(opts.role)}`]));
+    }
+    if (opts.transaction !== false) {
+      await conn.#exec({ text: 'BEGIN', values: [] });
+    }
+
+    return conn;
+  }
+
+  async #commit(conn: QueryHelper<Y, Y>, opts: QueryHelperBeginOption, commit = true) {
+    if (this.#nested) return;
+
+    try {
+      if (opts.transaction !== false) {
+        await conn.#exec({ text: commit ? 'COMMIT' : 'ROLLBACK', values: [] });
+      }
+      if (opts.role) {
+        await conn.#exec({ text: 'SET ROLE NONE', values: [] });
+      }
+    } finally {
+      await this.#opts.release?.(conn.#db);
+    }
+  }
+
+  async #rollback(conn: QueryHelper<Y, Y>, opts: QueryHelperBeginOption) {
+    return this.#commit(conn, opts, false);
+  }
+
   /**
    * BEGIN the transaction
    *
@@ -286,35 +338,29 @@ export class QueryHelper<X extends object = object> {
    *     return true;
    *   });
    */
-  async begin<R>(callback: (conn: this) => Promise<R>) {
-    if (this.#inTransaction === 0) {
-      await this.#exec({ text: 'BEGIN', values: [] });
+  async begin<R>(callback: (conn: WithQueryHelper<Y, Y>) => Promise<R>): Promise<R>;
+  async begin<R>(opts: QueryHelperBeginOption, callback: (conn: WithQueryHelper<Y, Y>) => Promise<R>): Promise<R>;
+  async begin<R>(
+    opts: QueryHelperBeginOption | ((conn: WithQueryHelper<Y, Y>) => Promise<R>),
+    callback?: (conn: WithQueryHelper<Y, Y>) => Promise<R>,
+  ) {
+    if (typeof opts === 'function') {
+      callback = opts;
+      opts = {};
     }
+    const conn: QueryHelper<Y, Y> = await this.#begin(opts);
 
-    this.#inTransaction += 1;
-
+    let result;
     try {
-      const result = await callback(this);
-
-      if (this.#inTransaction === 1) {
-        await this.#exec({ text: 'COMMIT', values: [] });
-      }
-
-      return result;
+      result = await callback!(conn.wrap());
     } catch (error) {
-      if (this.#inTransaction === 1) {
-        try {
-          await this.#exec({ text: 'ROLLBACK', values: [] });
-        } catch {
-          throw new Error('Rollback error', {
-            cause: error,
-          });
-        }
-      }
+      await this.#rollback(conn, opts);
       throw error;
-    } finally {
-      this.#inTransaction -= 1;
     }
+
+    await this.#commit(conn, opts);
+
+    return result;
   }
 
   // ======================================================================
@@ -375,6 +421,27 @@ export class QueryHelper<X extends object = object> {
       throw new Error('SQLite adapter requires a prepare function.');
     };
   }
+
+  wrap() {
+    const proxy: unknown = new Proxy(this.#db, {
+      get: (db, key, receiver) => {
+        const target = key in this ? this : key in db ? db : undefined;
+        const value = target && Reflect.get(target, key);
+
+        if (value && value instanceof Function) {
+          return function (this: unknown, ...args: unknown[]) {
+            const invocationTarget = this === receiver || this === proxy || this == null ? target : this;
+            const result = value.apply(invocationTarget, args);
+            return result === db ? proxy : result;
+          };
+        }
+
+        return value === db ? proxy : value;
+      },
+    });
+
+    return proxy as WithQueryHelper<X, Y>;
+  }
 }
 
 type Overwrite<T, Q> = Omit<T, keyof Q> & Q;
@@ -387,7 +454,7 @@ type MethodChainRewrite<T, Q> = {
 };
 type Override<T, Q> = Overwrite<MethodChainRewrite<T, Q>, Q>;
 
-export type WithQueryHelper<T extends object = object> = Override<T, QueryHelper<T>>;
+export type WithQueryHelper<X extends object = object, Y extends object = object> = Override<X, QueryHelper<X, Y>>;
 
 /**
  * Returns a proxy object that overrides the queryable instance `db` by Query Helper utilities
@@ -396,35 +463,17 @@ export type WithQueryHelper<T extends object = object> = Override<T, QueryHelper
  * @example
  *   const db = withQueryHelper(new pg.Client());
  */
-export function withQueryHelper<T extends Queryable<object>>(
-  db: T,
-  opts?: QueryHelperOptions & Partial<QueryableWithThis<T>>,
-): WithQueryHelper<T>;
-export function withQueryHelper<T extends object>(
-  db: T,
-  opts: QueryHelperOptions & QueryableWithThis<T>,
-): WithQueryHelper<T>;
-export function withQueryHelper<T extends object>(
-  db: T,
-  opts?: QueryHelperOptions & Partial<QueryableWithThis<T>>,
-): WithQueryHelper<T> {
-  const qh = new QueryHelper<T>(db, opts);
-  const proxy: unknown = new Proxy(db, {
-    get(db, key, receiver) {
-      const target = key in qh ? qh : key in db ? db : undefined;
-      const value = target && Reflect.get(target, key);
-
-      if (value && value instanceof Function) {
-        return function (this: unknown, ...args: unknown[]) {
-          const invocationTarget = this === receiver || this === proxy || this == null ? target : this;
-          const result = value.apply(invocationTarget, args);
-          return result === db ? proxy : result;
-        };
-      }
-
-      return value === db ? proxy : value;
-    },
-  });
-
-  return proxy as WithQueryHelper<T>;
+export function withQueryHelper<X extends Queryable<object>, Y extends object>(
+  db: X,
+  opts?: QueryHelperOptions<X, Y> & Partial<QueryableWithThis<X>>,
+): WithQueryHelper<X, Y>;
+export function withQueryHelper<X extends object, Y extends object>(
+  db: X,
+  opts: QueryHelperOptions<X, Y> & QueryableWithThis<X>,
+): WithQueryHelper<X, Y>;
+export function withQueryHelper<X extends object, Y extends object>(
+  db: X,
+  opts?: QueryHelperOptions<X, Y> & Partial<QueryableWithThis<X>>,
+): WithQueryHelper<X, Y> {
+  return new QueryHelper<X, Y>(db, opts).wrap();
 }
